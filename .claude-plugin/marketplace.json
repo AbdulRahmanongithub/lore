@@ -1,0 +1,15 @@
+{
+  "name": "lore",
+  "description": "Extract a codebase's business logic, domain rules and tribal knowledge into durable context for AI coding agents",
+  "owner": {
+    "name": "Abdul Rahman",
+    "url": "https://www.abdulrahmanonwork.free.nf"
+  },
+  "plugins": [
+    {
+      "name": "lore",
+      "source": "./plugins/lore",
+      "description": "Logic, Ownership, Rules, Evidence. Reads a codebase and writes .lore/ + AGENTS.md so your agent stops breaking the business."
+    }
+  ]
+}

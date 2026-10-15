@@ -1,0 +1,5 @@
+{
+  "name": "lore",
+  "version": "1.0.0",
+  "description": "Extracts business logic, domain rules, invariants, state machines and tribal knowledge from a codebase into a durable .lore/ folder plus AGENTS.md. Read-only."
+}
