@@ -1,6 +1,9 @@
 # lore
 
-**Logic · Ownership · Rules · Evidence**
+## Understand any business from its code.
+
+**Logic · Ownership · Rules · Evidence** — one skill for the part of your system an
+agent can't read: the rules, the money, and the landmines.
 
 Every codebase has lore: the unwritten knowledge in the heads of the people who built
 it. Why orders over ₹50,000 skip auto-approval. Which table you must never write to
@@ -240,7 +243,16 @@ Every install method copies from `plugins/lore/skills/lore`. Edit the skill in o
 
 ---
 
-## Publishing
+## Before you publish
+
+Replace `AbdulRahmanongithub` with your GitHub username in `README.md`, `package.json`,
+`install.sh` and `install.ps1`:
+
+```bash
+grep -rl AbdulRahmanongithub . | xargs sed -i 's/AbdulRahmanongithub/your-github-username/g'
+```
+
+Then validate and publish:
 
 ```bash
 claude plugin validate .                  # marketplace + plugin manifests

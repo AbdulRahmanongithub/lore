@@ -1,7 +1,7 @@
 {
   "name": "lore-skill",
   "version": "1.0.0",
-  "description": "Extract a codebase's business logic, domain rules, invariants and tribal knowledge into a durable .lore/ folder plus AGENTS.md that AI coding agents load. Read-only.",
+  "description": "Understand any business from its code. Extracts business logic, domain rules, invariants and tribal knowledge into a durable .lore/ folder plus AGENTS.md that AI coding agents load. Read-only.",
   "bin": {
     "lore-skill": "bin/cli.js"
   },
@@ -11,11 +11,23 @@
     "README.md"
   ],
   "keywords": [
-    "claude", "claude-code", "ai-agents", "skill", "agents-md",
-    "codebase-context", "business-logic", "documentation", "reverse-engineering"
+    "claude",
+    "claude-code",
+    "ai-agents",
+    "skill",
+    "agents-md",
+    "codebase-context",
+    "business-logic",
+    "documentation",
+    "reverse-engineering"
   ],
   "license": "MIT",
-  "engines": { "node": ">=18" },
-  "repository": { "type": "git", "url": "git+https://github.com/AbdulRahmanongithub/lore.git" },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbdulRahmanongithub/lore.git"
+  },
   "homepage": "https://github.com/AbdulRahmanongithub/lore#readme"
 }
