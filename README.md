@@ -99,10 +99,90 @@ cp -r lore/plugins/lore/skills/lore ~/.claude/skills/lore
 
 Or run Claude Code with `--plugin-dir ./lore/plugins/lore` to load it without installing.
 
-### Claude.ai and the desktop app
+### Claude Desktop
 
-Download `lore.skill` from [Releases](https://github.com/AbdulRahmanongithub/lore/releases) and
-upload it in Settings → Capabilities → Skills.
+The desktop app shares `~/.claude` with the CLI, so a plugin or user install is already
+visible in its **Code tab** — open a project folder there and talk to it, nothing extra
+to install.
+
+**Desktop chat** (not the Code tab) uses uploaded skills rather than plugins. Download
+`lore.skill` from [Releases](https://github.com/AbdulRahmanongithub/lore/releases) and
+upload it in **Settings → Capabilities → Skills**.
+
+Chat has no project filesystem of its own, so use the Code tab to *create* lore and chat
+to *consume* it — answering "what are the approval rules here?" from a `.lore/` you've
+already committed.
+
+### Claude.ai
+
+Same as desktop chat: download `lore.skill` from
+[Releases](https://github.com/AbdulRahmanongithub/lore/releases) and upload it in
+**Settings → Capabilities → Skills**.
+
+---
+
+## Setup
+
+If you already run Claude Code, skip this — `lore` needs nothing beyond it.
+
+### Install Claude Code
+
+**Windows PowerShell:**
+```powershell
+irm https://claude.ai/install.ps1 | iex
+```
+
+**macOS, Linux, WSL:**
+```bash
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+Then open a **new** terminal and check:
+```
+claude --version
+```
+
+### `claude: command not found` after installing
+
+The installer puts the binary in `~/.local/bin` and doesn't always add it to PATH. It
+tells you so in its own output, which is easy to miss.
+
+**Windows PowerShell** — fixes the current session and every future one:
+```powershell
+$env:Path += ";$env:USERPROFILE\.local\bin"
+[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ";$env:USERPROFILE\.local\bin", 'User')
+```
+
+**macOS, Linux** — add to `~/.zshrc` or `~/.bashrc`:
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Verify lore loaded
+
+```
+claude plugin details lore
+```
+
+The **Component inventory** should read `Skills (1)  lore`. If the plugin isn't listed at
+all, see the next item.
+
+### Installed but not showing up
+
+Skills and plugins install **per user account**, not per machine. Installing from an
+administrator shell and then working from your normal account is the usual cause — the
+plugin sits in that other account's `~/.claude`.
+
+Either install again from the account you actually code in, or sidestep user profiles
+entirely:
+
+```bash
+cd your-project
+npx lore-skill --project
+```
+
+That puts the skill in the project rather than a user profile, so it works regardless of
+which account is running Claude Code — and committing it means your whole team gets it.
 
 ---
 
