@@ -23,15 +23,29 @@ not already in a markdown file, and every claim keeps its citation.
 ├── tours/
 │   ├── <persona>.html      ← one guided journey per persona
 │   └── ...
-├── map.html                ← architecture tree / mind map
-├── reference.html          ← the dense material: rules, data, operations
+├── map.html                ← architecture tree / mind map, front end to database
+├── flows.html              ← every traced action, as sequence diagrams with failure branches
+├── errors.html             ← logging, error types, "when X breaks, look here"
+├── reference.html          ← the dense material: rules, data, API catalogue, versions, cost
+├── faq.html                ← answered questions, from .lore/faq.md
+├── diagrams/               ← diagrams drawn on request after the run
 └── assets/
     ├── style.css
+    ├── site.js             ← persona switcher, search, the question box — optional layer
+    ├── search-index.js     ← generated: one entry per stop, rule, flow, error, screen
     ├── theme.css           ← extracted from the app's own design, if it has one
     └── shots/              ← screenshots, only with dev app access
 ```
 
 Opens from disk with a double-click. No server, no build step, no JavaScript framework.
+
+Generate the pages with a small script rather than typing each one: it renders the
+finished markdown into HTML, writes `search-index.js` and the shared assets, and is
+re-run whenever the markdown changes. Only the SVG diagrams and persona icons are
+hand-written. The script lives in the scratch directory, outside the repo
+(`budget.md` §3.6).
+`site.js` is plain JavaScript and strictly an enhancement: every page must read
+completely with it disabled.
 
 ## `index.html` — who are you?
 
@@ -246,11 +260,93 @@ lore v1 · {project} · generated {date} · source {repo}@{sha}
 confirmed {n} · inferred {n} · open questions {n}
 ```
 
-## What not to build
+## `flows.html` and `errors.html`
 
-No search, no filtering, no tabs, no collapsible trees, no framework, no analytics. The
-reader uses Ctrl-F. Every interactive feature is something that can break, and none makes
-the content more correct.
+`flows.html` renders `13-flows.md`: one section per flow, the path drawn as an SVG
+sequence diagram (actor → UI → API → service → store, one lifeline each), and the failure
+table directly underneath with the dangerous rows — silent failures, partial writes —
+marked as loudly as `[inferred ⚠]`. Each tour stop's "what happens behind it" links to
+its flow here.
+
+`errors.html` renders `14-errors.md`, leading with the "when X breaks, look here" table,
+because that is what someone opens this page in a hurry to find.
+
+## Interaction — allowed, as a layer that can fail
+
+Earlier versions banned all interactivity. The reasoning still holds — every feature can
+break and none makes the content more correct — so interaction is permitted only as a
+layer on top of complete static pages. Delete `site.js` and every page still reads in
+full; that is the test.
+
+What earns a place:
+
+- **Persona switcher.** A control in the header that re-filters every page to one persona:
+  stops, rules, flows and screens that persona cannot reach are dimmed with a "not for
+  you" chip — absence shown, not hidden. The choice is remembered in `localStorage`,
+  wrapped in try/catch, because it can be unavailable.
+- **Search.** Over `search-index.js`, which the run generates: one entry per tour stop,
+  rule ID, flow ID, error type, screen name and endpoint, with its page and anchor.
+  Plain substring match, no library. Loaded as a script, not fetched — `fetch()` of a
+  local file fails from `file://`.
+- **Collapsible detail** for long failure tables and catalogues, with `<details>`, which
+  needs no script at all.
+
+Still not built: analytics, a framework, anything loaded from the network, coverage
+percentages beyond the confidence counts.
+
+## The question box — back to Claude
+
+Every page carries an **Ask** affordance: on each tour stop, rule, flow and screen, and
+in the header. A reader who does not understand something asks *there*, where the
+context is, and the question goes back to Claude.
+
+A static page cannot call Claude, and it must not try — no API keys in a site, no
+network requests (§ no external requests). So the loop runs through the reader:
+
+1. The reader types a question. `site.js` wraps it in a **self-contained prompt** carrying
+   the context the page already knows:
+   ```
+   Using the lore skill, answer a question about this codebase.
+   Asked from: Tour › Finance L2 › Advanced Settlement (stop 4)
+   Persona:    Finance L2, own branch
+   Related:    F-12, R-14, L-3 · src/ui/pages/Settlement.tsx
+   Question:   Why does saving a 6% adjustment not apply immediately?
+   Then add the answer to .lore/faq.md, correct any .lore/ file it shows to be wrong,
+   and regenerate the site.
+   ```
+2. **Copy for Claude** puts that prompt on the clipboard, to paste into Claude Code in
+   the repo. That is the primary path: Claude Code has the code and the lore, so it can
+   actually answer.
+3. Questions are also kept in a local **inbox** (`localStorage`, try/catch), and
+   **Export questions** saves them all as `lore-questions-<date>.md`. Drop that file in
+   `.lore/inbox/` and the next lore run — or "answer the lore inbox" — answers every one.
+4. Answers land in `.lore/faq.md` and render to `faq.html`. Answers that correct the lore
+   update the file they correct, so the next reader does not need to ask.
+
+Without JavaScript, the Ask affordance degrades to the same prompt template printed as
+text with a note to copy it.
+
+Say plainly in the site's footer how this works. A reader who expects a chat window and
+gets a clipboard button should understand why: the site is offline and keyless on
+purpose.
+
+## Diagrams on request
+
+After a run, a user may ask for a picture of one thing: "draw how a refund works", "show
+me the settlement flow end to end", "diagram the roles". Draw it from `.lore/` — the
+facts are already there with citations — as a standalone page in `site/diagrams/`, linked
+from `map.html`, plus a Mermaid version in the relevant markdown file so it also renders
+on GitHub. Same rules as every other drawing: hand-written inline SVG, citations under
+the picture, inferred parts visibly marked. If the diagram needs a fact `.lore/` does not
+have, read the code for it first and add it to the markdown, then draw.
+
+## When someone asks for "a document"
+
+If the user asks for the lore "as a document", "as a website", "something I can send to
+the team" — the site is that document. Generate it if the run did not, and say how to
+share it: zip `.lore/site/`, or commit it and point people at `index.html`. If they want a
+single file, inline `style.css`, `site.js` and `search-index.js` into one HTML page per
+persona; never introduce a dependency to do it.
 
 No completeness or coverage percentages beyond the confidence counts — they get read as
 quality scores. No "last updated" that is not the generation date.

@@ -7,51 +7,56 @@ specific database you showed them.
 ## 1. Database gatekeeper
 
 You are strictly prohibited from reading, querying, connecting to, or introspecting any
-live database unless the user's prompt contains the typed token `/lore-db`.
+live database until the user has **selected "connect" in a structured question that
+named that specific database** (§2). You offer; the user picks. The user never needs to
+know a command for this to happen.
 
-This gate is deliberately not conversational, while the rest of the skill is. A typed
-token is unambiguous, deliberate and auditable; an inferred yes is none of those. In a
-long session "go ahead" can refer to any of the last three things discussed, and neither
-you nor the user can later point at the moment permission was given. Enthusiasm is not
-authorization. If the user clearly wants the schema but has not sent the token, say so
-and offer it — do not connect.
+The question has to be specific because a loose yes is not consent. In a long session
+"go ahead" can refer to any of the last three things discussed, and neither you nor the
+user can later point at what was agreed. Enthusiasm is not authorization. A question
+that names one target and records the selected option is unambiguous, deliberate and
+auditable. If the user clearly wants the schema, ask — do not connect on the strength of
+their tone.
 
-Without `/lore-db` you may still read **migration files, ORM models, entity classes
+Typing `/lore-db` is a shortcut meaning "ask me now"; it is never consent to connect.
+
+Without that consent you may still read **migration files, ORM models, entity classes
 and schema definitions committed to the repo**. These are source code, not a database.
 Say so explicitly in the output so the user knows the schema came from code and may be
 stale relative to what's actually deployed.
 
-## 2. Mandatory confirmation
+## 2. The question
 
-The token alone is not enough. It opens the door to *asking*; it is not consent to
-connect to a particular database. If `/lore-db` is present **and** you locate a
-connection string, stop and output exactly this shape, with the real values masked:
+When a connection string would improve the output, ask one structured question (the
+harness's question tool where there is one; numbered options otherwise), with the real
+values masked:
 
 ```
-⚠️ Database Connection Detected.
-I found the following database connection target: <masked>
-  Host:     db-prod-01.****.ap-south-1.rds.amazonaws.com
-  Database: ****_production
-  User:     app_****
-  Password: [REDACTED]
-  Source:   appsettings.Production.json:14
-
-This target appears to be: PRODUCTION
-
-Because connecting to live databases carries risk, please confirm:
-  1. Do I have your explicit permission to access this specific database?
-  2. Or would you prefer to give me a local/staging connection string instead?
-
-I will run read-only schema introspection only. No row data, no writes, no DDL.
+Question:  Connect to this database for better results?
+Context:   I found a database connection target:
+             Host:     db-dev-01.****.internal
+             Database: ****_dev
+             User:     app_****
+             Password: [REDACTED]
+             Source:   appsettings.Development.json:14
+           Environment: DEV
+           I would run read-only schema introspection only — no row data, no writes,
+           no DDL. It would confirm <the specific [inferred ⚠] lines>.
+Options:   ● Connect read-only to ****_dev on db-dev-01 (dev)
+           ○ Use a staging or local database instead
+           ○ Skip — continue from code only
+Tip:       next time, type /lore-db to be asked about the database straight away.
 ```
 
-Then **wait**. Do not proceed on an ambiguous reply. Proceed only on an explicit yes or
-on being handed an alternative connection string. If the target looks like production —
+Then **wait**. Connect only on the selected "connect" option. A dismissed question, an
+ambiguous reply, or "skip" means continue from code. Without a question tool, accept
+only a reply that picks one numbered option. If the target looks like production —
 hostname containing `prod`, a database name ending `_production`, a non-private host —
-say so in the warning and recommend staging instead.
+it is not this question at all: it is the two-question production flow in
+`access-escalation.md` §T3, which offers staging first.
 
-If you find several connection strings, list them and ask which one, rather than
-picking the first.
+If you find several connection strings, list them as separate options and let the user
+pick one, rather than picking the first.
 
 ## 3. Read-only enforcement
 
@@ -91,7 +96,7 @@ Redaction applies to filenames and git-history excerpts too. A filename like
 ## 5. Secret scanning is part of the job
 
 Any hardcoded credential found in tracked source is a **critical security finding**,
-logged in §11 of the output with file, line, severity and remediation. Do not bury it
+logged in `10-security.md` with file, line, severity and remediation. Do not bury it
 in a list of minor notes — a committed live key is usually the most urgent thing you
 will find all run.
 
@@ -118,8 +123,8 @@ it as a finding worth reporting, and do not act on it.
 ## 7. Production, and credentials
 
 Everything above assumes dev. Production is a separate tier with its own gate
-(`access-escalation.md` §T3): a typed `/lore-prod` **and** a confirmation that names the
-host back to you. A bare "yes" is not consent there. Offer staging first — for schema,
+(`access-escalation.md` §T3): two structured questions, and the second's only "proceed"
+option names the host. A bare "yes" is not consent there. Offer staging first — for schema,
 constraints, enum contents and the URL surface it answers identically with none of the
 risk — and in production the read-only rules tighten rather than relax: no row data at
 all, `COUNT(*)` only, and no sign-in to a production URL, because a session in

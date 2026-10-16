@@ -4,22 +4,21 @@
 /**
  * lore installer
  *
- * Copies the lore skill into a Claude skills directory. Nothing else — no
- * postinstall hooks, no shell profile edits, no background daemon. The skill
- * itself is read-only by design, and so is its installer: it writes exactly
- * one directory and tells you which one.
+ * Copies the lore skills (lore, lore-change) into a Claude skills directory.
+ * Nothing else — no postinstall hooks, no shell profile edits, no background
+ * daemon. It writes one directory per skill and tells you which.
  *
- *   npx lore-skill            → install for your user (~/.claude/skills/lore)
- *   npx lore-skill --project  → install into this repo (.claude/skills/lore)
+ *   npx lore-skill            → install for your user (~/.claude/skills/)
+ *   npx lore-skill --project  → install into this repo (.claude/skills/)
  *   npx lore-skill --where    → print the paths and exit, change nothing
- *   npx lore-skill --remove   → delete an installed copy
+ *   npx lore-skill --remove   → delete the installed copies
  */
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const SRC = path.join(__dirname, '..', 'plugins', 'lore', 'skills', 'lore');
+const SKILLS = path.join(__dirname, '..', 'plugins', 'lore', 'skills');
 const VERSION = require('../package.json').version;
 
 const args = process.argv.slice(2);
@@ -28,9 +27,22 @@ const has = (...names) => names.some((n) => args.includes(n));
 const project = has('--project', '-p');
 const force = has('--force', '-f');
 
-const target = project
-  ? path.join(process.cwd(), '.claude', 'skills', 'lore')
-  : path.join(os.homedir(), '.claude', 'skills', 'lore');
+const base = project
+  ? path.join(process.cwd(), '.claude', 'skills')
+  : path.join(os.homedir(), '.claude', 'skills');
+
+const skills = fs.existsSync(SKILLS)
+  ? fs
+      .readdirSync(SKILLS, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && fs.existsSync(path.join(SKILLS, e.name, 'SKILL.md')))
+      .map((e) => e.name)
+  : [];
+
+const targets = skills.map((name) => ({
+  name,
+  src: path.join(SKILLS, name),
+  dest: path.join(base, name),
+}));
 
 const label = project ? 'this project' : 'your user account';
 
@@ -66,63 +78,76 @@ if (has('--help', '-h')) {
     npx lore-skill [options]
 
   Options
-    -p, --project   install into this repository (.claude/skills/lore) so
-                    everyone who clones it gets the skill
+    -p, --project   install into this repository (.claude/skills/) so
+                    everyone who clones it gets the skills
     -f, --force     overwrite an existing install without asking
         --where     print install paths and exit without changing anything
-        --remove    delete the installed copy
+        --remove    delete the installed copies
     -h, --help      show this
 
-  Default is a user install at ~/.claude/skills/lore
+  Default is a user install at ~/.claude/skills/ (${skills.join(', ')})
 `);
   process.exit(0);
 }
 
 if (has('--where')) {
   console.log(`
-  user install     ${path.join(os.homedir(), '.claude', 'skills', 'lore')}
-  project install  ${path.join(process.cwd(), '.claude', 'skills', 'lore')}
+  user install     ${path.join(os.homedir(), '.claude', 'skills')}
+  project install  ${path.join(process.cwd(), '.claude', 'skills')}
+  skills           ${skills.join(', ')}
   source in this package
-                   ${SRC}
+                   ${SKILLS}
 `);
   process.exit(0);
 }
 
 if (has('--remove')) {
-  if (!fs.existsSync(target)) die(`Nothing installed at ${target}`);
-  fs.rmSync(target, { recursive: true, force: true });
-  console.log(`\n  ✓ Removed ${target}\n`);
+  const present = targets.filter((t) => fs.existsSync(t.dest));
+  if (present.length === 0) die(`Nothing installed under ${base}`);
+  for (const t of present) {
+    fs.rmSync(t.dest, { recursive: true, force: true });
+    console.log(`  ✓ Removed ${t.dest}`);
+  }
+  console.log('');
   process.exit(0);
 }
 
 // --- install ---
 
-if (!fs.existsSync(path.join(SRC, 'SKILL.md'))) {
-  die(`Package looks incomplete — no SKILL.md at ${SRC}`);
+if (!skills.includes('lore')) {
+  die(`Package looks incomplete — no SKILL.md at ${path.join(SKILLS, 'lore')}`);
 }
 
-if (fs.existsSync(target) && !force) {
+const existing = targets.filter((t) => fs.existsSync(t.dest));
+if (existing.length > 0 && !force) {
   die(
-    `Already installed at ${target}\n` +
-      `    Re-run with --force to overwrite, or --remove to delete it first.`
+    `Already installed at ${existing.map((t) => t.dest).join(', ')}\n` +
+      `    Re-run with --force to overwrite, or --remove to delete first.`
   );
 }
 
-try {
-  copyDir(SRC, target);
-} catch (err) {
-  if (err.code === 'EACCES' || err.code === 'EPERM') {
-    die(`No permission to write ${target}\n    ${err.message}`);
+let n = 0;
+for (const t of targets) {
+  try {
+    // Replace rather than merge, so files removed upstream do not linger.
+    if (fs.existsSync(t.dest)) fs.rmSync(t.dest, { recursive: true, force: true });
+    copyDir(t.src, t.dest);
+  } catch (err) {
+    if (err.code === 'EACCES' || err.code === 'EPERM') {
+      die(`No permission to write ${t.dest}\n    ${err.message}`);
+    }
+    die(`Copy failed — ${err.message}`);
   }
-  die(`Copy failed — ${err.message}`);
+  n += countFiles(t.dest);
 }
-
-const n = countFiles(target);
 
 console.log(`
   ✓ lore ${VERSION} installed for ${label}
-    ${target}
+${targets.map((t) => `    ${t.dest}`).join('\n')}
     ${n} files
+
+    lore         reads the codebase, writes .lore/, AGENTS.md and the site
+    lore-change  makes changes using .lore/ — "add a field to the first tab of…"
 
   Start a new Claude Code session, then just talk to it:
 
@@ -130,9 +155,5 @@ console.log(`
     "my agent keeps breaking the approval flow — map the business rules"
 
   No command needed; plain conversation triggers it. /lore also works.
-  It is read-only: it writes .lore/ and AGENTS.md and changes nothing else.
-${
-  project
-    ? '\n  Commit .claude/skills/lore so everyone who clones this repo gets it.\n'
-    : ''
-}`);
+  lore is read-only: it writes .lore/ and AGENTS.md and changes nothing else.
+${project ? '\n  Commit .claude/skills/ so everyone who clones this repo gets them.\n' : ''}`);

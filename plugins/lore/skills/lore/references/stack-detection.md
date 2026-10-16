@@ -55,7 +55,7 @@ architectural preference.
 | File-as-database | CSV/Excel/JSON on disk or object storage | Location, owner, update cadence — common in internal tools and genuinely load-bearing |
 
 For schemaless stores the schema lives in the application code and in the actual
-documents. Derive it from the code first. With `/lore-db` granted you may sample
+documents. Derive it from the code first. With dev database access granted you may sample
 document *shapes* with values redacted — field names and presence rates, never records.
 
 The "file-as-database" row is easy to dismiss and often wrong to. A spreadsheet that

@@ -9,7 +9,7 @@
     {
       "name": "lore",
       "source": "./plugins/lore",
-      "description": "Understand any business from its code. Reads your code and writes .lore/ + AGENTS.md so your agent stops breaking the business."
+      "description": "Understand any business from its code. Reverse-engineers the business logic into .lore/ + AGENTS.md and a role-based tour site, then helps you change the code without re-explaining it."
     }
   ]
 }

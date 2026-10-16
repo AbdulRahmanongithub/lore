@@ -165,7 +165,7 @@ scc --by-file --sort complexity <path> | head -40
 ## Tier 2 — only when the target calls for it
 
 **tbls** or **schemacrawler** — database schema to markdown, including FKs, indexes and
-constraints. Relevant only under `/lore-db`, and only after the confirmation in
+constraints. Relevant only once the user has agreed to database access, via the question in
 `references/security.md` §2. Both read schema metadata rather than rows, which fits the
 read-only rule, but neither knows about it — so still connect with a read-only role and
 still never let them touch row data. Their constraint output is the single best input to

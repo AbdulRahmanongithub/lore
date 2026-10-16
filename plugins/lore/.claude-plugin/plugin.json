@@ -1,5 +1,5 @@
 {
   "name": "lore",
-  "version": "1.0.0",
-  "description": "Understand any business from its code. Extracts business logic, domain rules, invariants, state machines and tribal knowledge into a durable .lore/ folder plus AGENTS.md. Read-only."
+  "version": "1.1.0",
+  "description": "Understand any business from its code. Reads every file and writes .lore/ + AGENTS.md: rules, roles, money, APIs and cost drivers, versions, front-to-back traces with failure paths, errors and logs, and a screen-to-file change map, plus a role-based tour site. lore-change then uses it to make changes from a one-line request."
 }

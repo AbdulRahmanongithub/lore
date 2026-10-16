@@ -12,9 +12,77 @@ repo than the last.
 | Tier | Reaches | Gate |
 |---|---|---|
 | **T0 — code** | the repository, its history, committed config | none; this is the default |
-| **T1 — dev database** | live schema, constraints, enum and lookup rows | typed `/lore-db` + target confirmation |
-| **T2 — dev application** | the running app in a browser, signed in | typed `/lore-app` + the user signs in themselves |
-| **T3 — production** | any production database or URL | typed `/lore-prod` + two-step confirmation |
+| **T1 — dev database** | live schema, constraints, enum and lookup rows | one structured question naming the target |
+| **T2 — dev application** | the running app in a browser, signed in | one structured question + the user signs in themselves |
+| **T3 — production** | any production database or URL | two structured questions, the second naming the host |
+
+## Human in the loop — how consent is asked
+
+Access beyond the code is **offered by you and granted by the user through a structured
+question**, not unlocked by a token the user has to know about. A user who has never read
+this skill should still be asked, at the moment it would help, in a form they can answer
+with one click.
+
+Earlier versions required typed tokens (`/lore-db`, `/lore-app`, `/lore-prod`). The
+reason was sound: in a long session "yeah go ahead" can refer to any of the last three
+things discussed, and an inferred yes is neither deliberate nor auditable. A structured
+question solves the same problem better — it names exactly one target, offers explicit
+options, and the selected option sits in the transcript as the record of consent — and it
+does not require the user to have memorised a command.
+
+**What makes a question count as consent:**
+
+- It is asked through the harness's structured-question tool where one exists (Claude
+  Code's and Cowork's question tool, for instance), with selectable options.
+- It names **one** target — masked host, database name, environment — and what you would
+  do there. "Can I look at the database?" does not qualify; "Connect read-only to
+  `orders_dev` on `db-dev.****.internal` (from `.env.development:3`)?" does.
+- It says what the user gains, in concrete lines: which `[inferred ⚠]` claims become facts.
+- **"Skip — continue from code only" is always an option**, and is the first option for
+  production.
+- **It names its shortcut.** The last line of every access question is the command
+  for that tier, so the user learns it at the moment it is useful (see the table below).
+- The answer is the selected option. Free text typed alongside it that changes the
+  meaning ("yes but only staging") is treated as a new instruction, and you ask again
+  about the new target.
+
+**Without a structured-question tool**, ask in plain text with numbered options and accept
+only a reply that selects one unambiguously — `1`, or the option's words. A bare "ok",
+"sure" or "go ahead" is not an answer to a numbered question; ask once more, briefly.
+
+**Shortcuts still work.** A user who types `/lore-db`, `/lore-app` or `/lore-prod` is
+telling you up front that they want that tier. Treat it as permission to *ask* without
+waiting for a finding — never as permission to connect. The target confirmation still
+happens, every time.
+
+**Tell the user the shortcuts exist.** Nobody should need to read this file to learn
+them. Mention them at three points, once each per run, in one line — never as a lecture:
+
+| When | What to say |
+|---|---|
+| Phase 0 scope block | `Shortcuts: /lore-db database · /lore-app running app · /lore-prod production — type one and I'll ask now; otherwise I'll ask when it would help` |
+| Inside every access question, as its last line | `Tip: next time, type /lore-db to be asked about the database straight away.` — `/lore-app` for the app question, `/lore-prod` for both production questions. If the user typed the shortcut to raise this question, say `Asked because you typed /lore-db` instead. |
+| Closing summary, if any tier was skipped or never offered | `To add the live schema later: say /lore-db and I'll ask which database.` — naming what it would improve |
+
+Make clear every time that the shortcut **asks**, it does not connect: "type /lore-db
+and I'll ask", never "type /lore-db to connect".
+
+**One question per tier per run.** If the user picks Skip, do not ask again for that tier
+in this run; the gap goes to `11-open-questions.md` with what access would close it.
+
+Example — dev database, raised at the end of Phase 1:
+
+```
+Question:  Connect to the dev database for better results?
+Context:   Found in .env.development:3 →  postgres on db-dev.****.internal / orders_dev
+           I would read schema, constraints and lookup tables only — no customer rows,
+           no writes. It would confirm the approval thresholds (2 lines in 03-rules.md)
+           and the OrderStatus values (06-data-model.md), now marked [inferred ⚠].
+Options:   ● Connect read-only to orders_dev (dev)
+           ○ Use staging instead — I'll point you at its config
+           ○ Skip — continue from code only
+Tip:       next time, type /lore-db to be asked about the database straight away.
+```
 
 **Dev is the default everywhere.** When a user offers "the database" or "the site"
 without saying which environment, assume dev and say so: *"I'll use the dev instance —
@@ -30,9 +98,9 @@ generic request for more access is noise; a request tied to a finding is useful:
 
 > `03-rules.md` has the approval thresholds as `[config: appsettings.json:2]` — 5000 and
 > 50000. Those are the committed defaults, and `SettingsService.cs:40` reads the same
-> keys from a `Settings` table at runtime, so production may differ. If you send
-> `/lore-db` I can read the actual rows and replace two `[inferred ⚠]` lines with
-> `[db]` ones.
+> keys from a `Settings` table at runtime, so production may differ. If I connect to the
+> dev database I can read the actual rows and replace two `[inferred ⚠]` lines with
+> `[db]` ones. *(followed by the structured question above)*
 
 Say what you would learn and which lines would change. If the user declines, that is a
 complete answer: the gap stays in `11-open-questions.md` with a note that it needs
@@ -67,7 +135,46 @@ create, or a credential written into `.lore/`.
 
 ## T2 — the dev application, in a browser
 
-With `/lore-app` and a signed-in session, what you are mapping is the **real** URL
+Ask the same way: one question naming the dev URL, what you would do (read-only
+navigation), and what you would gain (the observed access matrix, screenshots). If the
+user agrees, ask them to sign in themselves in the browser and tell you when they have.
+
+```
+Question:  Look at the running dev app for better results?
+Context:   Found in .env.development:5 →  https://dev.orders.****.internal
+           I would only follow links and read pages — no forms, no buttons that change
+           anything. You sign in yourself; I never see your password. Signing in as an
+           admin lets me see every screen, menu and setting, which gives the most
+           accurate result.
+Options:   ● Yes — I'll sign in as an admin (full access)
+           ○ Yes — I'll sign in as a normal user
+           ○ Skip — continue from code only
+Tip:       next time, type /lore-app to be asked about the running app straight away.
+```
+
+### The admin session — maximum accuracy, no password in chat
+
+An admin account sees everything: every menu, every screen, every settings page, every
+lookup list. Read through an admin session, the app answers questions the code leaves
+open — which settings are actually switched on, what the menus really contain, which
+lookup values exist — so **offer admin first**.
+
+But the admin password still never enters the conversation (§ Credentials never enter
+the chat). If a user offers to type it, decline and explain in one line: *"Please sign in
+as admin in the browser yourself — I'll read through that session. A password typed here
+stays in the chat history."* Then wait for them to say they are signed in.
+
+In an admin session, two extra cautions:
+
+- **Admin screens are where the destructive buttons are.** Delete user, reset password,
+  run job, purge, recalculate. Read-only navigation (below) matters more here than
+  anywhere: open pages and read them; never press anything that acts.
+- **Admin sees more than any other role.** What admin sees is not what a clerk sees.
+  Use the session to learn what *exists*; take who-sees-what from the code and the access
+  model. If the user can also sign in as one or two ordinary test users, offer that as a
+  second pass for the persona tours — again, they sign in, you read.
+
+With consent and a signed-in session, what you are mapping is the **real** URL
 surface, which is frequently wider than the route table suggests: pages reachable that
 the code implies are protected, redirects that reveal role boundaries, forms whose
 validation differs from the server-side rules you read.
@@ -92,12 +199,24 @@ Production access is the only thing in this skill that can affect people who are
 the conversation. Customers' data lives there. So it takes two separate acts of consent,
 and neither substitutes for the other.
 
-**Step one — the typed token.** The user's message contains `/lore-prod`. Without it you
-do not touch production, no matter how clearly they seem to want it, and no matter that
-they already sent `/lore-db` or `/lore-app` — those authorize dev.
+Consent given for dev never carries over: agreeing to the dev database or dev app says
+nothing about production, and a target you discover is production (§ The tiers) moves to
+this section even if the user thought they were offering dev.
 
-**Step two — confirmation naming the target.** Show the masked target and require a
-reply that names the environment back to you:
+**Step one — do you want production at all?** Ask only when there is a stated reason
+staging cannot answer (row counts, drifted data, a hand-edited config row). Skip is the
+first option:
+
+```
+Question:  Production access — needed for <the specific reason>?
+Options:   ● Skip — continue without production
+           ○ Use staging instead
+           ○ Yes, I want to connect to production (read-only)
+Tip:       /lore-prod raises this question any time — both steps still apply.
+```
+
+**Step two — confirm the exact host.** Only after a yes in step one. Show the masked
+target and ask a second question whose only "proceed" option names the host:
 
 ```
 ⚠️  PRODUCTION ACCESS REQUESTED
@@ -115,13 +234,16 @@ reply that names the environment back to you:
   What I would gain:  <the specific lines this would confirm>
   Safer alternative:  a staging instance, if one exists, gives the same schema
 
-  To proceed, reply with the word PRODUCTION and the host above.
-  Anything else, including "yes" or "go ahead", I will treat as a no.
+Options:  ● Cancel — do not connect
+          ○ Connect read-only to PRODUCTION: cityneedsyou-prod.****.ap-south-1
+Tip:      /lore-prod raises this question any time — both steps still apply.
 ```
 
-Then **wait**. A bare "yes" is not consent at this tier — that is the entire point of
-asking for the host back. An ambiguous reply, a reply that changes the subject, or
-silence all mean no.
+Then **wait**. Only selecting the option that names the production host is consent.
+Cancel, a dismissed question, an ambiguous reply, a reply that changes the subject, or
+silence all mean no. Without a structured-question tool, require a reply containing the
+word PRODUCTION and the host — a bare "yes" is not consent at this tier, because naming
+the host back is the whole point of the second step.
 
 **Always offer staging first.** For almost everything this skill wants — schema,
 constraints, enum contents, the URL surface — staging answers identically with none of

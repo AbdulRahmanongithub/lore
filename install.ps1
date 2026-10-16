@@ -19,10 +19,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$target = if ($Project) {
-    Join-Path (Get-Location) '.claude\skills\lore'
+$base = if ($Project) {
+    Join-Path (Get-Location) '.claude\skills'
 } else {
-    Join-Path $HOME '.claude\skills\lore'
+    Join-Path $HOME '.claude\skills'
 }
 
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("lore-" + [guid]::NewGuid().ToString('N'))
@@ -43,29 +43,35 @@ try {
     $extracted = Get-ChildItem -Path $tmp -Directory | Select-Object -First 1
     if (-not $extracted) { throw "archive did not contain a directory" }
 
-    $src = Join-Path $extracted.FullName 'plugins\lore\skills\lore'
-    if (-not (Test-Path (Join-Path $src 'SKILL.md'))) {
-        throw "archive has no SKILL.md at $src"
+    $skills = Join-Path $extracted.FullName 'plugins\lore\skills'
+    if (-not (Test-Path (Join-Path $skills 'lore\SKILL.md'))) {
+        throw "archive has no SKILL.md at $skills\lore"
     }
 
-    if (Test-Path $target) {
-        Write-Host "  replacing existing install at $target"
-        Remove-Item -Path $target -Recurse -Force
-    }
+    if (-not (Test-Path $base)) { New-Item -ItemType Directory -Path $base -Force | Out-Null }
 
-    $parent = Split-Path $target -Parent
-    if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
-    Copy-Item -Path $src -Destination $target -Recurse -Force
+    foreach ($src in Get-ChildItem -Path $skills -Directory) {
+        if (-not (Test-Path (Join-Path $src.FullName 'SKILL.md'))) { continue }
+        $target = Join-Path $base $src.Name
+        if (Test-Path $target) {
+            Write-Host "  replacing existing install at $target"
+            Remove-Item -Path $target -Recurse -Force
+        }
+        Copy-Item -Path $src.FullName -Destination $target -Recurse -Force
+        Write-Host "  installed $($src.Name) -> $target"
+    }
 
     Write-Host ""
     Write-Host "  lore installed" -ForegroundColor Green
-    Write-Host "    $target"
+    Write-Host "    lore         - reads the codebase, writes .lore/ and the site"
+    Write-Host "    lore-change  - makes changes using .lore/"
     Write-Host ""
     Write-Host "  Start a new Claude Code session and just talk to it -"
     Write-Host "  no command needed. /lore also works."
     if ($Project) {
         Write-Host ""
-        Write-Host "  Commit .claude\skills\lore so everyone who clones this repo gets it."
+        Write-Host "  Commit .claude\skills\lore and .claude\skills\lore-change so everyone"
+        Write-Host "  who clones this repo gets them."
     }
     Write-Host ""
 }

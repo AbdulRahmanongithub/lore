@@ -1,6 +1,6 @@
 ---
 name: lore
-description: Understand any business from its code. Extracts business logic, domain rules, invariants, state machines and tribal knowledge into a durable .lore/ folder plus AGENTS.md and a guided-tour website that walks a reader through the app as each kind of user experiences it, with an architecture map. No command needed; plain conversation triggers it. Use whenever someone hands over code, repos or docs and asks to map out the business, understand what a system does, onboard onto an unfamiliar codebase, build durable context for Claude Code, document an app's pages, roles and permissions, or fix an agent that "keeps breaking things it shouldn't touch." Also on /lore, /lore-db, /lore-app or /lore-prod. READ-ONLY — it inspects and documents, never modifies. Dev only by default; production needs a typed token plus confirmation; it never asks for credentials in chat.
+description: Understand any business from its code — reverse engineering for systems you have but nobody explained. Reads every file of any app type (web, desktop, Windows services, batch, stored procedures, SSIS, mobile, ETL, legacy) and writes .lore/ plus AGENTS.md: rules as decision tables, sign-in and every flag that blocks it, roles, money, APIs and cost drivers, exact versions, every table with who writes and reads it and where its data comes from, traces with failure paths, errors and logs, symptom-to-cause diagnostics, and a screen-to-file change map; plus a role-based tour site. Use when someone wants to understand, document or onboard onto a codebase, take a legacy system to production with no docs or handover, or stop an agent breaking business rules. Also on /lore. Read-only; asks before any live database or app access, never for passwords. For changes, use lore-change.
 ---
 
 # lore
@@ -23,6 +23,10 @@ description: Understand any business from its code. Extracts business logic, dom
 > install. Having them is not permission to use them here. Read-only is the operating
 > mode this skill runs in, and it holds for the whole run regardless of what your tools
 > allow, what you notice along the way, or how small the change would be.
+>
+> Changing the code *using* the lore is a different job with a different skill:
+> `lore-change`. If the user asks for a change mid-run, finish or pause the run, then
+> hand over to it — never mix the two in one pass.
 
 ## 1. Who you are writing for
 
@@ -105,6 +109,39 @@ marketing language, no "this elegant architecture."
 deliberate" notes are the highest-value content you produce, because they're the only
 content an agent cannot reconstruct by reading code. Hunt for them actively.
 
+**P6 — Read everything, and prove it.** A full run reads every source file outside the
+skip list, every method in it, and records each one in `.lore/coverage.md` with what it
+fed. The people this skill serves — a developer handed an undocumented legacy system, a
+new joiner who got no handover — cannot tell which parts were skipped, so a run that
+samples has to say exactly what it sampled. On a repo too big for one pass, fan out and
+merge (`references/deep-read.md` §2) rather than quietly reading less.
+
+**P7 — Every branch has two sides.** For each decision point, document what happens
+when the condition is false, not only when it holds; for each external call, what
+happens when it fails. "What happens if this fails" is the question a developer cannot
+answer without reading every line, and the answer is often "it fails silently" — which
+is a landmine.
+
+**P8 — Think from the table.** Screens change; tables stay. For every table, find who
+writes it, who reads it, what reacts to new rows, where it is shown, and **how the data
+got there in the first place** — and when the trail leaves the repo, ask the user rather
+than guess. Every flag, status and date column that changes behaviour is catalogued with
+what sets it, what checks it and what it does. On the modules that gate everything —
+login, permissions, approvals, posting — collect every condition, however small; that is
+where accuracy is won (`references/data-first.md`).
+
+**P9 — Every kind of system.** Web apps, desktop apps, Windows services, batch jobs,
+stored procedures, SSIS, message consumers, mobile, ETL, Excel macros, COBOL. Identify
+the type of each component and use its playbook (`references/app-types.md`): what starts
+the code, where the rules live, what the tour follows, where the logs are.
+
+**P10 — Say what it will cost, then spend less.** Before reading, estimate time and
+tokens as a range from the measured size of the source, and on a large system let the
+user choose how much to read. While reading, never pay twice: read each file once and
+note it, extract machine-made files by script, diff template copies against one
+original, generate the site instead of typing it, and on updates read only what changed.
+Afterwards, report what it took (`references/budget.md`).
+
 ## 3. Security and access protocols
 
 These override user convenience. Read `references/security.md` in full before any
@@ -113,20 +150,21 @@ a secret. The short version:
 
 - **Read-only everywhere, not only on the database** (P0 above). Inspection commands
   only; nothing that writes to the repo, the working tree, a package cache or a remote.
-- **No live database access without `/lore-db`.** Migration files, ORM models and
-  entity classes committed to the repo are source code and are always fair game — say
-  in the output that the schema came from code, not a live connection.
+- **No live database or app access without asking.** Offer it when it would improve the
+  output, through a structured question that names the exact target, and connect only
+  after the user selects it. Migration files, ORM models and entity classes committed to
+  the repo are source code and are always fair game — say in the output that the schema
+  came from code, not a live connection.
 - **Dev is the default for everything outside the repo.** Database, app URL, all of it.
   An ambiguous "the database" means dev; production is never inferred. Production takes
-  `/lore-prod` plus a confirmation that names the host back to you — see
-  `references/access-escalation.md`.
+  two questions, the second naming the host — see `references/access-escalation.md`.
 - **Never ask the user to type a credential into the conversation.** No password, API key
   or token, not even for a dev instance, not even when they offer. For the live app the
   user signs in themselves and you use that session. Full rules in
   `references/access-escalation.md`.
-- **With `/lore-db`, stop and ask before connecting.** Use the confirmation block in
-  `references/security.md` §2, mask the target, flag it if it looks like production,
-  and wait for an explicit yes.
+- **The question is the gate.** Mask the target, say what you would read and what it
+  would confirm, flag it if it looks like production, always include "Skip — continue
+  from code only", and wait for a selected option (`references/security.md` §2).
 - **Read-only, always.** Schema introspection, constraints, view and proc definitions,
   `COUNT(*)`, and enum/lookup table contents (those are business logic). Never user,
   customer or transaction rows. Never a write, never DDL, not even "just to test it."
@@ -169,8 +207,19 @@ write `.lore/CHANGELOG.md`. Say what you found before touching anything: "There'
 a `.lore/` here from 12 September with 14 `[user]` answers in it. I'll keep all of those
 and refresh what came from code." Never silently overwrite.
 
-**Database access.** This one is not a mode, and it does not become conversational. See
-below.
+An update reads **only what changed**: files whose git blob hash differs from the one
+recorded in `coverage.md`, new files, and whatever the CRUD matrix and change map say
+depends on them. Everything else carries forward. Say so in the estimate — an update
+usually costs a small fraction of the first run (`references/budget.md` §3.8).
+
+If `.lore/inbox/` holds exported questions from the site, or the user pastes a prompt
+the site's question box produced, answer each one from `.lore/` and the code, record it
+in `.lore/faq.md` with evidence, correct any lore the answer shows to be wrong, and
+regenerate the affected site pages. Move answered inbox files to `.lore/inbox/answered/`.
+A question can be answered without a full run.
+
+**Database and app access.** Not a mode and not something the user has to know to ask
+for. You offer it, at the point it would help, as a structured question. See below.
 
 ### Asking well
 
@@ -189,35 +238,39 @@ costs the user a click instead of a paragraph, which is what makes a conversatio
 actually lighter than a flag rather than merely chattier. Fall back to the numbered
 `BLOCKING` / `ENRICHING` list when there is no such interface.
 
-### `/lore-db` stays a typed token, on purpose
+### Live access — you ask, the user picks
 
-Everything above moved from flag to conversation because the cost of guessing wrong is a
-re-run. Database access is different: it is the one capability in this skill that reaches
-outside the repo, touches a system that can be production, and cannot be undone by
-deleting a file.
+Database and app access are the capabilities in this skill that reach outside the repo,
+can touch a system that turns out to be production, and cannot be undone by deleting a
+file. So consent has to be unambiguous — but it should not depend on the user knowing a
+secret command.
 
-A conversational gate is too weak for that. In a long session "yeah go ahead" can refer
-to the previous three things discussed, enthusiasm reads as authorization, and neither
-you nor the user can later point at the moment permission was given. A typed token is
-unambiguous, it is deliberate, and it is auditable — the user can see in their own
-transcript exactly where they granted it.
+A loose "yeah go ahead" is not enough: in a long session it can refer to any of the last
+three things discussed, and neither of you can later point at what was agreed. A
+**structured question** fixes that: it names one target, offers explicit options, and
+the selected option is the record in the transcript. So:
 
-So the flow is **two steps, and both are required**:
+1. **You offer**, when a finding makes it worthwhile — never as a generic request, and
+   never before Phase 1 has shown what is missing.
+2. **You ask one structured question** naming the masked target, what you would read
+   (schema only, no customer rows, no writes), what it would confirm, with options to
+   connect, use staging instead, or skip (`references/access-escalation.md`).
+3. **You connect only on the selected "connect" option** for *that* target. Anything else
+   — skip, a dismissed question, an unclear reply — means continue from code.
 
-1. The user's message contains `/lore-db`. Without it, you do not connect — no matter how
-   clearly they seem to want the schema, and no matter how the conversation is going.
-2. You then show the masked target and ask again (`references/security.md` §2), and wait
-   for an explicit yes on *that specific database*.
+Where there is no structured-question tool, use numbered options and accept only a reply
+that picks one. Production always takes a second question that names the host
+(`references/access-escalation.md` §T3).
 
-What you should do conversationally is **offer** it, so the user is never stuck wondering
-why the schema is missing:
+`/lore-db`, `/lore-app` and `/lore-prod` remain as shortcuts: typing one means "I want
+this tier, ask me now". It replaces waiting for a finding, never the question itself.
 
-> I found a connection string in `appsettings.Production.json`. I haven't touched it —
-> schema in `.lore/` came from the migration files and entity classes instead, so it
-> reflects the code rather than what's actually deployed. If you want the real schema,
-> send `/lore-db` and I'll show you the target and confirm before connecting anything.
-
-That reads as naturally as anything else here, and it keeps the gate where it belongs.
+**Tell users the shortcuts exist** — they cannot use what they have never heard of. One
+line in the Phase 0 scope block, a one-line tip as the last line of **every** access
+question — database, app, and both production questions — and, if any
+tier was skipped, one line in the closing summary saying which shortcut adds it later
+and what it would improve. Always phrase it as "type /lore-db and I'll ask", never "to
+connect" (`references/access-escalation.md`, Tell the user the shortcuts exist).
 
 ## 5. Asking for more access
 
@@ -227,9 +280,9 @@ There are four tiers, each reaching further outside the repo than the last:
 | Tier | Reaches | Gate |
 |---|---|---|
 | **T0 — code** | the repo, its history, committed config | none; the default |
-| **T1 — dev database** | live schema, constraints, lookup rows | `/lore-db` + target confirmation |
-| **T2 — dev application** | the running app in a browser, signed in | `/lore-app` + the user signs in themselves |
-| **T3 — production** | any production database or URL | `/lore-prod` + two-step confirmation |
+| **T1 — dev database** | live schema, constraints, lookup rows | one structured question naming the target |
+| **T2 — dev application** | the running app in a browser, signed in | one structured question + the user signs in themselves |
+| **T3 — production** | any production database or URL | two structured questions, the second naming the host |
 
 Three rules govern all of them. `references/access-escalation.md` has the detail, and is
 required reading before you ask for anything above T0.
@@ -237,7 +290,8 @@ required reading before you ask for anything above T0.
 **Offer, tied to a finding.** Never a generic request for more access. Name the wall,
 say which lines would change, and let the user decide: *"the thresholds in `03-rules.md`
 are committed defaults but `SettingsService.cs:40` reads them from a table at runtime —
-`/lore-db` would let me replace two `[inferred ⚠]` lines with real values."* A decline is
+connecting to the dev database would let me replace two `[inferred ⚠]` lines with real
+values"*, then the question. A decline is
 a complete answer; the gap goes to `11-open-questions.md` noting what access would close
 it, and the run continues. Never ask twice in one run.
 
@@ -272,12 +326,28 @@ while it is still free to redirect you.
 lore · scope
   Sources:   <repo paths / URLs / uploaded docs>
   Size:      <N files, M LOC, primary languages>
-  DB access: DISABLED (no /lore-db token)  |  PENDING CONFIRMATION  |  GRANTED (staging)
+  Type:      <per component: web SPA + API · Windows service ×2 · 41 SPs · SSIS ×3>
+  DB access: CODE ONLY (not offered yet)  |  ASKED  |  GRANTED (dev)  |  DECLINED
+  Shortcuts: /lore-db database · /lore-app running app · /lore-prod production
+             type one and I'll ask now — otherwise I'll ask when it would help
   Mode:      full | quick | update
-  Output:    .lore/ + AGENTS.md at <root>
+  Output:    .lore/ + AGENTS.md + site/ at <root>
   Tooling:   <detected: git, ripgrep, ast-grep> | <missing: gitleaks, syft>
-  Est:       ~<N> files to read
+  Coverage:  <N> source files in inventory, all to be read | split into <k> shards
+  Budget:    source ≈ <MB> · ~<k> tokens of code across <N> files
+             full run ≈ <low>–<high> tokens processed · ~<min>–<max> min (<k> shards)
 ```
+
+Build the file inventory now — it is the denominator for `coverage.md` and for the
+claim in `index.md` — and decide whether the run fits one pass or needs to fan out
+(`references/deep-read.md` §1–2).
+
+Measure the source in bytes and turn it into the budget line: a token range and a time
+range, never a single number (`references/budget.md` §1). If `.lore/index.md` has run
+stats from an earlier run, calibrate from those instead. When the full run is large —
+over ~1M tokens or ~30 minutes — ask one structured question before reading: full,
+focused on named modules, full without the website, or quick, each with its own estimate
+(`references/budget.md` §2). Below that, show the estimate and start.
 
 Detect optional tooling here, once, and say what it changes — the user should learn what
 this run can and cannot do *before* waiting for it. Detect by invoking each tool and
@@ -305,13 +375,21 @@ Read in this order. It front-loads signal and avoids burning context on generate
    recover and the most valuable thing you will write down.
 1. **Orientation** — README, `docs/`, CONTRIBUTING, ADRs, wiki exports, user-supplied
    documents, the live site.
-2. **Manifests** — the dependency file for whichever ecosystem this is. Pin
-   **versions**, flag EOL runtimes.
-3. **Entry points** — where the process actually starts and wiring happens: bootstrap
-   file, DI/service registration, middleware or interceptor chain, route table. This
-   reveals the real architecture faster than any folder scan.
+2. **Manifests and versions** — the dependency file for whichever ecosystem this is,
+   plus the lockfile for **resolved** versions, the runtime pins, Dockerfile base images
+   and the engine versions of every database, cache and broker. Every direct dependency,
+   declared and resolved; flag EOL runtimes (`references/deep-read.md` §6).
+3. **Entry points and connectivity** — where each process starts and wiring happens:
+   bootstrap file, DI/service registration, middleware or interceptor chain, route table.
+   Then how the pieces connect: the front end's HTTP client and base URL, CORS and proxy
+   rules, the ORM or driver and its connection config, brokers, and anything that
+   reaches the database without going through the API (`references/deep-read.md` §3).
 4. **Config** — config files, env files, secret managers, feature flags, per-environment
    overrides. Record *where* config lives and *which keys exist*; values redacted.
+4a. **Errors and logging** — logging library, sinks and levels per environment, error
+   tracking, custom error types, error codes, the global handler and response envelope,
+   front-end error handling, and how a developer actually reads the logs in each
+   environment. Read `references/errors-and-logs.md`.
 5. **Routes and controllers** — every endpoint and page URL, verb, auth attribute,
    role requirement. Attributes carry only the *role* dimension of access; the rest of
    the model is elsewhere (step 5a).
@@ -324,28 +402,46 @@ Read in this order. It front-loads signal and avoids burning context on generate
    another. The sign-in path is the single most informative place to look, because
    whatever is resolved into the claims is what the app treats as identity. Read
    `references/access-model.md` before writing anything about roles.
-6. **Domain model** — entities, DTOs, enums, migrations, validators. Enums are business
+6. **Data, from the table outward** — every table, view, stored procedure, function and
+   trigger (from the repo, or the database if the user agreed). For each table: writers,
+   readers, what reacts to it, where it is shown, where its data comes from. Build the
+   CRUD matrix and the flag/status/date catalogue. Find everything that **waits for data**
+   — polling services, SQL Agent jobs, file watchers, queue consumers — and how each
+   claims and finishes work. Read `references/data-first.md`.
+6a. **Domain model** — entities, DTOs, enums, migrations, validators. Enums are business
    logic; transcribe them in full. For each enum value, check whether any code path
    actually sets it — a value nothing writes means a removed feature or manual database
    edits, and both are lore an agent needs. With `ast-grep` present this is a query
    rather than a reading exercise, which is the difference between holding at ten files
    and holding at two thousand.
 7. **Services / handlers / use-cases** — where the business rules live. Spend the most
-   time here. This is the section the whole skill exists to produce.
+   time here. This is the section the whole skill exists to produce. Every method; each
+   condition written down with both outcomes (P7), each rule given an `R-` ID.
 8. **Background work** — cron jobs, queues, schedulers, webhooks, event handlers.
    Agents miss these constantly because nothing calls them from the code they're editing.
-9. **Integrations** — HTTP clients, SDK usage, payment gateways, mail/SMS, storage.
-10. **Tests** — the fastest honest description of intended behaviour. Read test *names*
+9. **Integrations** — HTTP clients, SDK usage, payment gateways, mail/SMS, storage. For
+   each paid service, what triggers a billable call and what multiplies it — loops,
+   retries, polling, crons (`references/deep-read.md` §7). Never a price from memory.
+10. **Front end** — every page, its route, its tabs and forms, the client-side
+    validation, which API calls it makes, and what it hides or disables per role. Name
+    screens the way the UI labels them; that is how users will ask for changes.
+11. **Tests** — the fastest honest description of intended behaviour. Read test *names*
     before test bodies; the names are a free specification.
-11. **Infra** — Dockerfiles, compose, CI workflows, IaC, deploy scripts.
+12. **Infra** — Dockerfiles, compose, CI workflows, IaC, deploy scripts.
+13. **Traces** — with the pieces read, join them: for each action that writes, moves
+    money or sits behind a permission, follow it from the UI through the request,
+    handler, service and writes to the response, then fill in every failure branch
+    (`references/deep-read.md` §4). This is the step that turns a pile of facts into
+    something a developer can change safely.
 
-This order is language-neutral. Every stack has these eleven things; only the filenames
+This order is language-neutral. Every stack has these things; only the filenames
 change — see `references/stack-detection.md` for how to find each one in any ecosystem,
 plus data-store, architecture-style and CI/CD detection tables.
 
 **Skip:** vendored dependencies (`node_modules`, `vendor/`, `.venv`, `target/`, `Pods/`,
-`packages/`), build output (`bin`, `obj`, `dist`, `build`, `out`), lockfiles, minified
-assets, generated clients and protobuf stubs, migration data dumps, snapshot/fixture blobs.
+`packages/`), build output (`bin`, `obj`, `dist`, `build`, `out`), minified assets,
+generated clients and protobuf stubs, migration data dumps, snapshot/fixture blobs.
+Lockfiles are read for resolved versions only. Every skip is a row in `coverage.md`.
 
 **Keep a running `[inferred ⚠]` list as you go.** Those become your questions in Phase 2.
 
@@ -381,13 +477,13 @@ same note, and the run continues on what you have.
 
 Output two things and stop.
 
-### 6.1 Findings summary
+### 8.1 Findings summary
 
 A compact pass over the output sections showing, per section, what you established and
 with what confidence (`confirmed` / `partial` / `missing`). A scannable page or two —
 not a draft of the final output.
 
-### 6.2 Ranked questions — maximum 10
+### 8.2 Ranked questions — maximum 10
 
 Ask these as one batch, not as a conversation. Where the interface offers structured
 multiple-choice questions, use it and make each proposed answer a selectable option — a
@@ -428,6 +524,12 @@ ENRICHING
    My guess: the feature was removed and rejections are done by hand in the DB.
 ```
 
+**Where does this data come from?** — a separate group after the ranked questions, for
+tables whose rows arrive from outside the repo **and** drive behaviour: a polled table
+with no writer in the code, a feed nobody imports, an SP nothing calls. Each with your
+best guess as an option and "I don't know" as another (`references/data-first.md` §4).
+One answer here often explains a whole subsystem, so these do not count against the ten.
+
 Always close with:
 
 > Do you have existing architectural, technical or business documentation — specs, ADRs,
@@ -439,8 +541,8 @@ item `[inferred ⚠ — unconfirmed]` and keep it in `11-open-questions.md`.
 
 ## 9. Phase 3 — Database pass
 
-Only with the typed `/lore-db` token **and** a separate explicit confirmation on the
-specific target (§5, and `references/security.md` §2). Both steps, every time.
+Only after the user selected "connect" in a structured question naming this specific
+target (§4, §5, and `references/security.md` §2). Every time, for every target.
 
 Adapt to the store type (see `references/stack-detection.md`).
 
@@ -481,12 +583,23 @@ Write to the **repo root**, so an agent finds it without being told where to loo
     ├── 10-security.md     ← posture + 🚨 findings, hardcoded secrets first
     ├── 11-open-questions.md
     ├── 12-landmines.md    ← read before changing anything
+    ├── 13-flows.md        ← every action traced UI → API → service → DB, with failures
+    ├── 14-errors.md       ← logging, error types, codes, "when X breaks, look here"
+    ├── 15-change-map.md   ← screen/tab → files → endpoint → table, layer by layer
+    ├── 16-diagnostics.md  ← symptom → causes in check order → the query that confirms
+    ├── coverage.md        ← every source file: read in full, skimmed or skipped, and why
+    ├── faq.md             ← answered questions, from the site or conversation
+    ├── inbox/             ← questions exported from the site, waiting for answers
     └── site/              ← a guided tour, for a person to be walked through
         ├── index.html     ← "who are you?" — personas from the real access model
         ├── tours/         ← one journey per persona, stop by stop
-        ├── map.html       ← architecture tree / mind map
-        ├── reference.html ← the dense material: rules, data, operations
-        └── assets/        ← style.css, theme.css (the app's own design), shots/
+        ├── map.html       ← architecture tree / mind map, front end to database
+        ├── flows.html     ← traced actions as sequence diagrams, failure tables
+        ├── errors.html    ← where the logs are and what each failure means
+        ├── reference.html ← rules, data, API catalogue, versions, cost drivers
+        ├── faq.html       ← rendered from faq.md
+        ├── diagrams/      ← drawn on request after the run
+        └── assets/        ← style.css, site.js, search-index.js, theme.css, shots/
 ```
 
 `references/output-template.md` has the full content template for each file — follow
@@ -561,15 +674,80 @@ Confidence: confirmed <n> · inferred <n> · open questions <n>
 ```
 
 Also write `.lore/index.md` last, once you know the real counts. It is the file a human
-opens to judge whether the run was any good.
+opens to judge whether the run was any good. End it with **Run stats** — files read,
+bytes of source, estimated tokens processed against the range you gave, wall time, and
+what the next update will likely cost — marking which numbers were measured and which
+estimated, and pointing at the harness's own usage view (`/cost` in Claude Code) for the
+exact count (`references/budget.md` §5).
+
+**Generate the site, don't type it.** Write a small generator (Python or Node, whichever
+exists) in the scratch directory outside the repo that renders `.lore/*.md` into the
+pages, search index and shared assets; hand-write only the SVG diagrams and icons. It
+writes only into `.lore/site/` (`references/budget.md` §3.6).
 
 **Tell the user to commit it.** Lore that lives only on one machine stops being lore the
 moment someone else joins. One line is enough: "commit `.lore/` and `AGENTS.md` so every
 agent session and every teammate gets the same context."
 
-## 11. Self-check before writing
+## 11. After the run — the lore keeps working
+
+The folder is not the end product; it is what every later request stands on. Handle these
+without a new full run:
+
+**"Draw how X works" / "show me a diagram of Y".** Draw it from `.lore/` as a page in
+`site/diagrams/` plus a Mermaid block in the relevant markdown file
+(`references/tour-site.md`, Diagrams on request). If `.lore/` lacks a fact the picture
+needs, read the code for it, add it to the markdown with its citation, then draw.
+
+**"Give it to me as a document" / "something I can send the team".** The site is the
+document. Generate it if the run skipped it, and say how to share it.
+
+**A question pasted from the site, or "answer the lore inbox".** Answer from `.lore/`
+and the code, record in `faq.md`, correct what the answer shows was wrong (§4).
+
+**"Add a field to…", "change the validation on…", "fix…".** That is a change, not a
+documentation task. Hand over to `lore-change`, which uses this folder to resolve the
+screen to files, follow the field through every layer, respect the rules and landmines,
+and keep `.lore/` current afterwards.
+
+## 12. Self-check before writing
 
 - [ ] Is `03-rules.md` the longest file? If not, you documented a stack, not a business.
+- [ ] Does `coverage.md` have a row for every file in the inventory, and does the
+      headline in `index.md` match it?
+- [ ] Does every rule with a condition have a decision table with its false branch?
+- [ ] Does every flow in `13-flows.md` have a failure table, and did each silent failure
+      also go into `12-landmines.md`?
+- [ ] Is the sign-in sequence documented step by step, including what each failure
+      returns?
+- [ ] Does `05-architecture.md` give exact versions — declared and resolved — for the
+      runtime, framework, every direct dependency and every database or broker engine?
+- [ ] Is every internal endpoint in the API catalogue, counted by what runs (P1a)?
+- [ ] Does every paid integration name what triggers a billable call, with no price
+      that lacks a source and date?
+- [ ] Does `14-errors.md` say where the logs go in each environment and how to read them,
+      using this repo's real paths and names?
+- [ ] Can every screen in the UI be found in `15-change-map.md` by the name a user would
+      say, with its "to add a field here, touch" line?
+- [ ] Does every table have writers, readers and a data origin — and where the origin
+      was outside the repo, did you ask rather than guess?
+- [ ] Is every flag, status and date column that changes behaviour in the catalogue,
+      with what sets it, what checks it and what it does?
+- [ ] Is every stored procedure and trigger documented like a service method, including
+      who calls it?
+- [ ] Does every service, job or worker say what starts it, how it claims work, and what
+      happens to a row that keeps failing?
+- [ ] For the gatekeeping modules — login above all — is every condition listed, and does
+      `16-diagnostics.md` turn each into a check a developer can run?
+- [ ] Did you identify the type of every component and follow its playbook?
+- [ ] Did the scope block give a token range and a time range, and did a large run ask
+      the user how much to read before reading it?
+- [ ] Was any file read in full twice, any lockfile read rather than extracted, or any
+      template copy read rather than diffed? Each is a token leak.
+- [ ] Did a long run give progress notes, and stop to re-estimate if it ran well past
+      the range?
+- [ ] Does `index.md` end with run stats, measured and estimated numbers labelled, and
+      does `coverage.md` record each file's blob hash for the next update?
 - [ ] Does every line carry a provenance tag?
 - [ ] Is every secret `[REDACTED]`, in chat and on disk?
 - [ ] Are `11-open-questions.md` and `12-landmines.md` non-empty? Empty ones mean you
@@ -579,8 +757,9 @@ agent session and every teammate gets the same context."
 - [ ] Did you avoid asking the user anything that was sitting in the repo?
 - [ ] Did you start working instead of interviewing — one batch of questions, not a
       back-and-forth before any reading happened?
-- [ ] If a connection string exists and no `/lore-db` token was given, did you say so and
-      offer it, rather than silently omitting the schema?
+- [ ] If a connection string or dev URL exists, did you offer access with one structured
+      question tied to what it would confirm, rather than silently omitting it — and
+      connect only on a selected option?
 - [ ] Did you detect the stack rather than assume one, and name every component in a
       polyglot system?
 - [ ] Is the deployment path documented honestly, including "there is no pipeline"?
@@ -604,8 +783,11 @@ agent session and every teammate gets the same context."
 - [ ] Did you name the missing sources at the end of Phase 1, each with what it would
       unlock, without asking for a credential to be pasted?
 - [ ] Did any credential ever get requested in the conversation? It must not have.
-- [ ] If production was touched, was there a typed `/lore-prod` **and** a confirmation
-      naming the host, and is the access recorded in the output?
+- [ ] If production was touched, were there two questions — the second's selected option
+      naming the host — and is the access recorded in the output?
+- [ ] Did the user hear about `/lore-db`, `/lore-app` and `/lore-prod` — in the scope
+      block, under any access question, and in the closing summary if a tier was skipped
+      — phrased as "I'll ask", not "to connect"?
 - [ ] Did you close with the tooling note — what was used, what was missing, and what
       each missing tool would have added?
 - [ ] Did you leave the system exactly as you found it — no edits, no git state changes,
@@ -632,6 +814,23 @@ agent session and every teammate gets the same context."
   each stop carries, the architecture map, the data-journey variant for systems with no
   UI, borrowing the app's design without borrowing its credibility, and the screenshot
   rules.
+- `references/deep-read.md` — the coverage ledger, fanning out on large repos, the
+  front-to-back connectivity map, traces with failure branches, rules as decision
+  tables, versions from the source of truth, and cost drivers. Read in Phase 0.
+- `references/budget.md` — estimating time and tokens from the measured source,
+  letting the user choose full / focused / quick before spending, the eight ways to
+  spend less without reading less, progress and over-budget stops, and the run stats.
+  Read in Phase 0.
+- `references/data-first.md` — thinking from the table: every table's writers, readers
+  and data origin, the CRUD matrix, the flag catalogue, SPs and triggers as business
+  logic, services that wait for data, asking where data comes from, and diagnostics.
+  Read in Phase 1.
+- `references/app-types.md` — playbooks for web, desktop, Windows services, batch,
+  database-centric, message-driven, mobile, ETL, Office/VBA, legacy and serverless
+  systems. Read in Phase 0.
+- `references/errors-and-logs.md` — logging sinks and how to read them, the error
+  model, custom error types and codes, failure behaviour, and the "when X breaks" table.
+  Read in Phase 1.
 - `references/tooling.md` — which optional open-source tools earn their place
   (ast-grep, gitleaks/trufflehog, scc, tbls, syft), how to detect them without the
   `sg`/setgroups trap, why embeddings and whole-repo packers are deliberately excluded,

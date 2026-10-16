@@ -1,7 +1,7 @@
 {
   "name": "lore-skill",
-  "version": "1.0.0",
-  "description": "Understand any business from its code. Extracts business logic, domain rules, invariants and tribal knowledge into a durable .lore/ folder plus AGENTS.md that AI coding agents load. Read-only.",
+  "version": "1.1.0",
+  "description": "Understand any business from its code. Reverse-engineers business logic, roles, rules, APIs, versions, flows and failure paths into .lore/ + AGENTS.md, and helps AI agents change the code safely.",
   "bin": {
     "lore-skill": "bin/cli.js"
   },
