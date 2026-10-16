@@ -209,9 +209,14 @@ everything unverified. Otherwise you get the full two-phase run.
 existing folder, keeps every `[user]` answer verbatim, refreshes what came from code,
 and writes `.lore/CHANGELOG.md`.
 
+**Missing sources get named.** At the end of its reading pass it lists what it doesn't
+have — no dev connection string, no dev URL, no docs — and for each one, what it would
+unlock in concrete terms: which file, which lines, which `[inferred ⚠]` becomes a fact.
+A request without that is nagging; with it, it's a decision you make in five seconds.
+Decline and each one goes to `11-open-questions.md` with the same note.
+
 **More access** — dev database, the live dev app, or production — is gated by a typed
-token each (`/lore-db`, `/lore-app`, `/lore-prod`). It offers these when it hits a wall
-it can't read past. See below.
+token each (`/lore-db`, `/lore-app`, `/lore-prod`). See below.
 
 ---
 
@@ -328,35 +333,75 @@ recovers the business from code.
 | `10-security.md` | Posture and 🚨 findings, hardcoded secrets first |
 | `11-open-questions.md` | Every unconfirmed inference. **This file existing is a feature.** |
 | `12-landmines.md` | Code that looks wrong but is deliberate. Read before changing anything. |
-| `html/` | The same facts as a readable doc set — six self-contained pages, no CDN, no build step. Open `index.html` by double-clicking it. |
+| `site/` | A guided-tour website — pick who you are and get walked through the app as that person experiences it, plus an architecture map. Open `index.html` by double-clicking it. |
 
-### The HTML doc set
+### The guided tour
 
-`.lore/*.md` is written for an agent to grep. `html/` is written for a **person** — a new
-developer on day one, a client who wants to know what they bought, a reviewer who will
-never open a terminal.
+`.lore/*.md` is for an agent to grep. `site/` is for a **person to be walked through** —
+a new developer on day one, a client who wants to understand what they paid for, a tester
+who needs to know what each screen is meant to do.
 
-| Page | Contents |
-|---|---|
-| `index.html` | What the app is, who uses it, how it works, and the vocabulary whose meaning here differs from the everyday one |
-| `pages.html` | Every URL and page, what it does, **who can reach it**, and anything with no authorization at all |
-| `rules.html` | Invariants, state machines (including illegal transitions), calculations with worked examples |
-| `data.html` | Entities, relationships, enums in full |
-| `operations.html` | Jobs, integrations, environments, how deployment actually happens |
+It opens with **"who are you?"**. Each stop on a tour is one screen of the app and carries
+four things:
+
+- **What you see** — including what's *absent* for this persona that another would see
+- **What you do** — the actions available
+- **What happens behind it** — which service, which rules fire, what gets written or queued
+- **Where you can go next** — the real navigation, so it's a path and not a list
+
+That third one is what makes it documentation rather than a user manual.
+
+**Personas come from your real access model, not a role list.** Access in real apps is
+layered — a role, a scope like region or warehouse, often a level. So a persona is a
+combination that behaves distinctly: *Warehouse Manager · one region · approval level 2*.
+`lore` works the model out from the code first: the roles, the scopes, the levels, and how
+they compose — including the bypasses.
+
+It deliberately does **not** generate the cross product. Three roles × five regions ×
+three levels is forty-five tours and nobody takes any of them. Scope changes *which
+records* you touch rather than *what* you can do, so it's a stated rule inside the tour;
+level usually does change behaviour, so it earns its own persona.
+
+**`map.html`** is an architecture tree — hand-drawn SVG, no library — on every site, and
+the front door when there's no UI. For a Windows service, API or batch job there are no
+screens, so the tour follows the **data** instead: what arrives, what triggers each stage,
+what rule applies, what's written, what happens when it fails.
+
+**It borrows your app's design** if it has a UI — palette, type stack, logo copied in
+locally — so the tour feels like your product. Two hard limits: no external requests ever
+(a CDN font breaks the site offline and won't work in two years), and borrowing the design
+mustn't borrow the credibility — every page carries the lore header and provenance legend,
+so nobody mistakes a tour stop for the real app.
+
+**Screenshots** only with `/lore-app`, only from dev, and only after looking at what's on
+the screen: dev databases are often restored from production, so a dev screen can hold
+real names and order amounts. A described screen with no PII beats a captured one with it.
 
 It renders **from** the finished markdown rather than beside it, so the two can't drift.
-Pages are self-contained — no CDN, no fonts fetched, no JavaScript — because this often
-describes a client's system, may be read offline, and should still work in two years.
-Provenance tags survive the rendering and `[inferred ⚠]` stays visually obvious: a guess
-that looks like a fact in a polished document is more dangerous than the same guess in
-plain markdown.
+Every claim keeps its citation, and `[inferred ⚠]` stays visually loud — a guess that
+looks like a fact is more dangerous in a polished site than in plain markdown.
 
-Every line carries a provenance tag — `[code: path:line]`, `[config: …]`, `[user]`,
-`[inferred ⚠]` — so an agent can tell fact from guess at a glance. An unmarked guess
-gets treated as ground truth and propagates into code, which is the failure this whole
-design exists to prevent.
+### Your access model, as it actually is
 
----
+The most common failure in documenting who-can-do-what is treating access as a list of
+roles. `lore` looks for all three dimensions:
+
+- **Role** — declared, easy to find: enums, claims, policies, `[Authorize]` attributes
+- **Scope** — which records you act on. **Usually not declared anywhere as a permission** —
+  it lives in query filters like `Where(r => r.RegionId == user.RegionId)`, global filters
+  and tenancy discriminators. Missing one of these is how a feature leaks one region's
+  data into another.
+- **Level** — graded authority within a role: approval level 1/2/3, threshold bands
+
+Then how they **compose**: does a higher level inherit the lower ones? Is scope
+hierarchical, so a regional manager sees every warehouse in their region? Can someone hold
+several at once, and what wins? Which role escapes scoping entirely — that bypass is often
+the most dangerous rule in the system. And the negative rules no role list can express:
+"an approver cannot approve a requisition they raised."
+
+If your app genuinely has two roles and no scoping, it says so plainly — that's valuable
+too, because it tells an agent that adding a region filter would be a new concept here
+rather than a pattern to imitate.
 
 ## Repo layout
 
@@ -371,7 +416,8 @@ plugins/lore/
       stack-detection.md          ← manifests, data stores, CI/CD per ecosystem
       output-template.md          ← content template for each .lore/ file
       access-escalation.md        ← the four access tiers and their gates
-      html-output.md              ← the human-readable HTML doc set
+      access-model.md             ← discovering role × scope × level, not a flat list
+      tour-site.md                ← the guided-tour site and architecture map
       tooling.md                  ← which tools earn their place, and why not the rest
 bin/cli.js                        ← npx installer
 install.sh / install.ps1          ← curl installers

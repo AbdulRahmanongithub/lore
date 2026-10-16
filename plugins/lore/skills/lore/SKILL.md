@@ -1,6 +1,6 @@
 ---
 name: lore
-description: Understand any business from its code. Extracts business logic, domain rules, invariants, state machines and tribal knowledge into a durable .lore/ folder plus AGENTS.md and a human-readable HTML doc set covering every URL, page and who can access it. No command needed; plain conversation triggers it. Use whenever someone hands over code, repos or docs and asks to map out the business, understand what a system does, onboard onto an unfamiliar codebase, build durable context for Claude Code, document an app's pages and permissions, or fix an agent that "keeps breaking things it shouldn't touch." Also on /lore, /lore-db, /lore-app or /lore-prod. READ-ONLY — it inspects and documents, never modifies. Dev only by default; production needs a typed token plus confirmation; it never asks for credentials in chat.
+description: Understand any business from its code. Extracts business logic, domain rules, invariants, state machines and tribal knowledge into a durable .lore/ folder plus AGENTS.md and a guided-tour website that walks a reader through the app as each kind of user experiences it, with an architecture map. No command needed; plain conversation triggers it. Use whenever someone hands over code, repos or docs and asks to map out the business, understand what a system does, onboard onto an unfamiliar codebase, build durable context for Claude Code, document an app's pages, roles and permissions, or fix an agent that "keeps breaking things it shouldn't touch." Also on /lore, /lore-db, /lore-app or /lore-prod. READ-ONLY — it inspects and documents, never modifies. Dev only by default; production needs a typed token plus confirmation; it never asks for credentials in chat.
 ---
 
 # lore
@@ -304,7 +304,17 @@ Read in this order. It front-loads signal and avoids burning context on generate
 4. **Config** — config files, env files, secret managers, feature flags, per-environment
    overrides. Record *where* config lives and *which keys exist*; values redacted.
 5. **Routes and controllers** — every endpoint and page URL, verb, auth attribute,
-   role requirement.
+   role requirement. Attributes carry only the *role* dimension of access; the rest of
+   the model is elsewhere (step 5a).
+5a. **The access model** — work out its real shape before documenting any of it. Access
+   is rarely a flat role list: it is usually role × scope (region, warehouse, department,
+   tenant) × level (approval grade, threshold band). The role dimension is declared and
+   easy to find; **scope normally is not** — it lives in query filters keyed off the
+   current user (`Where(r => r.RegionId == user.RegionId)`), global query filters and
+   tenancy discriminators, and an agent that misses one leaks one region's data into
+   another. The sign-in path is the single most informative place to look, because
+   whatever is resolved into the claims is what the app treats as identity. Read
+   `references/access-model.md` before writing anything about roles.
 6. **Domain model** — entities, DTOs, enums, migrations, validators. Enums are business
    logic; transcribe them in full. For each enum value, check whether any code path
    actually sets it — a value nothing writes means a removed feature or manual database
@@ -329,6 +339,34 @@ plus data-store, architecture-style and CI/CD detection tables.
 assets, generated clients and protobuf stubs, migration data dumps, snapshot/fixture blobs.
 
 **Keep a running `[inferred ⚠]` list as you go.** Those become your questions in Phase 2.
+
+### Before leaving Phase 1 — name what is missing
+
+Some gaps are not questions about the code, they are **sources you do not have**. Those
+deserve their own short list, separate from the questions, because the user can often
+close them in one action:
+
+```
+Sources I don't have
+  dev connection string  — nothing in appsettings.Development.json and no .env
+                           → with it: real schema, constraints, enum rows; would
+                             confirm 4 [inferred ⚠] lines in 06-data-model.md
+  dev app URL            — no URL in any committed config
+                           → with it: the observed access matrix, which is often wider
+                             than the route table declares, plus screenshots
+  product docs / specs   — no docs/, no ADRs, no wiki export in the repo
+                           → with it: the "why" behind the approval thresholds, which
+                             code cannot tell me
+```
+
+For each: what is missing, how you looked, and **what it would unlock in concrete terms**
+— which file, which lines, which inference becomes a fact. A request without that is
+nagging; a request with it is a decision the user can make in five seconds.
+
+Then say how to hand each one over, and the answer is never "paste it here": point me at
+a file, or sign in to the dev app yourself and I'll use that session (§5). If the user
+declines or doesn't answer, each missing source goes into `11-open-questions.md` with the
+same note, and the run continues on what you have.
 
 ## 8. Phase 2 — Report, then ask. Do not write the folder yet.
 
@@ -434,33 +472,52 @@ Write to the **repo root**, so an agent finds it without being told where to loo
     ├── 10-security.md     ← posture + 🚨 findings, hardcoded secrets first
     ├── 11-open-questions.md
     ├── 12-landmines.md    ← read before changing anything
-    └── html/              ← the same facts, for a person to read
-        ├── index.html     ← what it is, who uses it, how it works, vocabulary
-        ├── pages.html     ← every URL and page + who can reach each one
-        ├── rules.html     ← invariants, state machines, calculations
-        ├── data.html      ← entities, enums, relationships
-        ├── operations.html← jobs, integrations, environments, deployment
-        └── assets/style.css
+    └── site/              ← a guided tour, for a person to be walked through
+        ├── index.html     ← "who are you?" — personas from the real access model
+        ├── tours/         ← one journey per persona, stop by stop
+        ├── map.html       ← architecture tree / mind map
+        ├── reference.html ← the dense material: rules, data, operations
+        └── assets/        ← style.css, theme.css (the app's own design), shots/
 ```
 
 `references/output-template.md` has the full content template for each file — follow
 its headings exactly so the folder stays greppable across runs and across repos.
 
-**The HTML is for people, the markdown is for agents.** `references/html-output.md` has
-the spec. The one rule that matters more than the rest: **render the HTML from the
-finished markdown, never author the two separately.** Write `.lore/*.md` completely
-first, then generate `html/` from it. Authored in parallel they drift within a single
-revision, and a documentation set that contradicts itself is worse than either half
-alone, because the reader cannot tell which side is stale. The HTML therefore introduces
-no fact that is not already in a markdown file.
+**The markdown is for agents; the site is a guided tour for people.** Full spec in
+`references/tour-site.md`. The shape of it:
 
-Six HTML pages rather than thirteen: a person reading wants a few long pages with a clear
-spine, where an agent grepping wants one concern per file. Pages are self-contained —
-no CDN, no fonts fetched, no JavaScript — because this often describes a client's system,
-may be read offline or on an air-gapped machine, and should still work in two years.
-Provenance tags survive the rendering, and `[inferred ⚠]` stays visually obvious: a guess
-that looks like a fact in a polished document is more dangerous than the same guess in
-plain markdown, because the polish lends it authority.
+The site opens with **"who are you?"** and walks the reader through the app as that
+person experiences it. Each stop is one screen, carrying four things: what you see
+(including what is *absent* for this persona), what you do, **what happens behind it** —
+which service, which rules fire, what gets written or queued — and where you can go next.
+That third one is what separates documentation from a user manual.
+
+Personas come from the **real access model**, which is why §7 step 5a exists. They are
+combinations that behave distinctly — "Warehouse Manager · one region · approval level 2"
+— named in the project's own words. **Do not generate the cross product:** three roles ×
+five regions × three levels is forty-five tours and nobody takes any of them. Scope
+changes *which records* a person touches rather than *what* they can do, so it belongs as
+a stated rule inside the tour; level usually does change behaviour, so it earns separate
+personas.
+
+`map.html` is an architecture tree — hand-drawn inline SVG, no library — on every site,
+and the **front door when there is no UI**. For a service, API or batch job there are no
+screens, so the tour follows the **data** instead: what arrives, what triggers each
+stage, what rule applies, what is written, what happens when it fails.
+
+If the app has a UI, borrow its design: palette, type stack, logo **copied** into
+`assets/`, never hotlinked. Two hard limits — no external requests ever (a CDN font
+breaks the site offline, leaks which internal systems exist, and won't work in two
+years), and borrowing the design must not borrow the credibility: every page carries the
+lore header and the provenance legend, so nobody mistakes a tour stop for the real
+application.
+
+**Render from the finished markdown, never alongside it.** Write `.lore/*.md` completely,
+then generate. In parallel they drift inside one revision, and a doc set that contradicts
+itself is worse than either half, because the reader cannot tell which side is stale.
+Every claim keeps its citation, and `[inferred ⚠]` stays visually loud — a guess that
+looks like a fact is more dangerous in a polished site than in plain markdown, because
+the design lends it authority it hasn't earned.
 
 Two rules about this layout that matter more than they look:
 
@@ -508,9 +565,20 @@ agent session and every teammate gets the same context."
 - [ ] Did you detect the stack rather than assume one, and name every component in a
       polyglot system?
 - [ ] Is the deployment path documented honestly, including "there is no pipeline"?
-- [ ] Was the HTML rendered from the finished markdown rather than written alongside it?
-- [ ] Does `pages.html` list every URL with who can reach it, including the pages with no
-      authorization attribute at all?
+- [ ] Was the site rendered from the finished markdown rather than written alongside it?
+- [ ] Did you establish the access model's real shape — role × scope × level — rather
+      than documenting a flat role list? Did you hunt for scope filters in queries, not
+      just authorization attributes?
+- [ ] Are the tour personas combinations that behave distinctly, rather than the cross
+      product of every role, scope and level?
+- [ ] Does the reference matrix include every page with no authorization at all, written
+      as "anonymous" rather than left blank?
+- [ ] Does every tour stop say what happens *behind* the screen, not only what the user
+      sees?
+- [ ] Does the site make zero external requests, and does it read correctly with every
+      screenshot missing?
+- [ ] Did you name the missing sources at the end of Phase 1, each with what it would
+      unlock, without asking for a credential to be pasted?
 - [ ] Did any credential ever get requested in the conversation? It must not have.
 - [ ] If production was touched, was there a typed `/lore-prod` **and** a confirmation
       naming the host, and is the access recorded in the output?
@@ -532,9 +600,14 @@ agent session and every teammate gets the same context."
   escalation without nagging, why credentials never enter the chat, read-only navigation
   in a live app, and the production two-step. Required reading before asking for anything
   beyond the code.
-- `references/html-output.md` — the human-readable HTML set: page structure, the URL and
-  access inventory, why it renders from the markdown rather than beside it, and the
-  self-contained/no-CDN rule.
+- `references/access-model.md` — how to discover the real access model: role × scope ×
+  level, why scope hides in query filters rather than attributes, how the dimensions
+  compose, and why enumerating the cross product produces documentation nobody reads.
+  Read before writing anything about roles.
+- `references/tour-site.md` — the guided-tour site: personas from the access model, what
+  each stop carries, the architecture map, the data-journey variant for systems with no
+  UI, borrowing the app's design without borrowing its credibility, and the screenshot
+  rules.
 - `references/tooling.md` — which optional open-source tools earn their place
   (ast-grep, gitleaks/trufflehog, scc, tbls, syft), how to detect them without the
   `sg`/setgroups trap, why embeddings and whole-repo packers are deliberately excluded,

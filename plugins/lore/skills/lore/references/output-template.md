@@ -61,7 +61,17 @@ Weakest areas: {which files are thinnest and why}
 
 ## `02-roles.md`
 
+Start with the **shape** of the access model in one or two sentences — "access is role ×
+region-scope × approval-level, all resolved at sign-in into claims" — before any list of
+roles. A reader who gets only that sentence understands more than a role list can teach
+them. See `access-model.md`; scope and level normally are not declared as permissions and
+have to be found in query filters and threshold logic.
+
 * **Auth mechanism:** cookie, JWT, SSO, provider, session lifetime
+* **Model shape:** the dimensions in play, and how they compose (inheritance, hierarchy,
+  conflicts, bypasses)
+* **Scope dimension:** where records get filtered by a user attribute, and what escapes it
+* **Level dimension:** grades, thresholds, and what each unlocks
 * **Role-based:** yes/no · where roles are defined
 * **Roles:** each with purpose, how it is granted, what only it can do.
   Super Admin gets its own subsection — list every bypass and override it holds.
