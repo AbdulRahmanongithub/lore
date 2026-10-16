@@ -377,6 +377,13 @@ so nobody mistakes a tour stop for the real app.
 the screen: dev databases are often restored from production, so a dev screen can hold
 real names and order amounts. A described screen with no PII beats a captured one with it.
 
+**The visuals carry the weight, not the prose.** The access model, the scope rule, the
+state machine as stages, route coverage as a proportional bar, any graded ladder — each is
+a hand-drawn SVG with the text explaining the picture rather than repeating it. Every
+persona gets its own icon. Things that are *absent* get marked visually — a role declared
+but inert, an enum value nothing sets — because prose hides absence and a strike-through
+does not.
+
 It renders **from** the finished markdown rather than beside it, so the two can't drift.
 Every claim keeps its citation, and `[inferred ⚠]` stays visually loud — a guess that
 looks like a fact is more dangerous in a polished site than in plain markdown.

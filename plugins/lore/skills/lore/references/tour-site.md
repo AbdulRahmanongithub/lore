@@ -168,6 +168,58 @@ crop to the relevant region, and keep them in `assets/shots/`. Screenshots are
 supplementary: the tour must read correctly with every image missing, because that is how
 it will be read whenever the capture step was skipped.
 
+## Carry the weight in pictures, not paragraphs
+
+The reader came to the tour because the markdown was too dense. If the site is the same
+prose with a nicer font, it has not earned its existence. **Every section that could be a
+picture should be a picture**, and the text underneath should explain the picture rather
+than repeat it.
+
+Everything is hand-written inline SVG — no diagramming library, no icon font, no CDN
+(§ no external requests). That constraint is less limiting than it sounds: the diagrams
+worth drawing here are boxes, rings, arrows and dots.
+
+**The diagrams that nearly always earn their place:**
+
+- **The access model**, if any dimension is non-obvious. One picture showing what splits
+  a user into each persona beats three paragraphs, especially when the split is a profile
+  state rather than a role.
+- **Spatial or tenancy scope**, when the system has one. A seeker at the centre, the hard
+  cap as a dashed ring, each actor's own radius as a second ring, and dots marking who
+  matches and who does not. This is the single most valuable drawing in a geo app,
+  because the rule is invisible in the route table and almost impossible to hold in the
+  head from prose.
+- **State machines**, as *stages* rather than every transition. Grouping seven statuses
+  into "waiting / active / ended" with the statuses inside each is read in two seconds; a
+  full transition graph with ten arrows is read in two minutes, and the arrows mostly
+  restate what the names already say. Draw the transitions only where one is surprising,
+  and then call it out rather than burying it among the ordinary ones.
+- **Coverage, as a proportional bar.** "23 of 89 routes carry a role check, 52 carry
+  authentication only, 14 are public" is a bar with three segments and a key. Nobody
+  reads that sentence twice; everybody reads the bar once.
+- **Graded ladders** — levels, tiers, thresholds — as a row of rungs with the real
+  thresholds under each. If the ladder grants no access, say so *on* the picture.
+
+**Give every persona an icon**, drawn to mean something about that persona rather than
+pulled from a generic set, and use the same icon for that persona everywhere it appears.
+Icons on the four facets of a tour stop (see, do, behind, next) turn a wall of headings
+into something scannable.
+
+**Keep labels out of crowded drawings.** When three or more annotations compete for room
+inside a diagram, put short markers in the picture (A, B, C) and move the explanations to
+a key underneath. A drawing with text crossing its own strokes is slower to read than the
+paragraph it replaced.
+
+**Mark absence visually.** A role that is declared but inert, an enum value nothing sets,
+a level that grants nothing: strike it through, give it a "no effect" chip, say it on the
+diagram. Absence is information, and prose hides it.
+
+**Check what you drew.** Where the session can render the page, look at it once before
+publishing: SVG labels overlap, a CSS class silently overrides a `fill` attribute and
+leaves a shape blank, and a long unbreakable token in a citation pushes the page wider
+than a phone screen. None of these is visible in the markup, and all three are obvious in
+a screenshot.
+
 ## Provenance survives the rendering
 
 Every claim keeps its tag, rendered as small muted text after the claim. The legend sits

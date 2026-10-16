@@ -78,6 +78,15 @@ Untagged lines are forbidden. The whole value of the output collapses if an agen
 tell fact from guess at a glance — an unmarked guess gets treated as ground truth and
 propagates into code.
 
+**P1a — Count by what runs, not by what greps.** A number in the output is a claim like
+any other, and a miscounted one is worse than a missing one because it reads as precise.
+Before writing "N of M", check that you counted the thing you meant: a guard defined once
+and applied forty times greps as one occurrence; a framework that attaches authorization
+as a parameter (`Depends(admin)`), a decorator, a middleware or a base class will not
+appear where a naive search looks. Count the *applications*, and where a count would
+change how an agent reads the system — how many endpoints are unprotected, how many rows
+a job touches — verify it a second way before it goes in.
+
 **P2 — Never invent.** If you cannot find it and the user has not told you, it goes in
 `11-open-questions.md`, not into the body as a plausible-sounding sentence. One
 hallucinated business rule poisons every future agent session that loads this folder.
@@ -512,6 +521,16 @@ years), and borrowing the design must not borrow the credibility: every page car
 lore header and the provenance legend, so nobody mistakes a tour stop for the real
 application.
 
+**Carry the weight in pictures.** The reader came to the site because the markdown was
+too dense; the same prose in a nicer font has not earned its existence. Draw the access
+model, the scope rule, the state machine as *stages*, coverage as a proportional bar, any
+graded ladder. Hand-written inline SVG only — no diagramming library, no icon font, no
+CDN. Give each persona its own icon and reuse it everywhere that persona appears. When
+three or more labels compete inside one drawing, put short markers (A, B, C) in the
+picture and move the explanations to a key underneath. **Mark absence visually** — a role
+declared but inert, an enum value nothing sets, a level that grants nothing — because
+prose hides absence and a strike-through or a "no effect" chip does not.
+
 **Render from the finished markdown, never alongside it.** Write `.lore/*.md` completely,
 then generate. In parallel they drift inside one revision, and a doc set that contradicts
 itself is worse than either half, because the reader cannot tell which side is stale.
@@ -577,6 +596,11 @@ agent session and every teammate gets the same context."
       sees?
 - [ ] Does the site make zero external requests, and does it read correctly with every
       screenshot missing?
+- [ ] Is each major section carried by a diagram rather than a paragraph, with the text
+      explaining the picture instead of repeating it?
+- [ ] If the session can render the page, did you look at it once? Overlapping SVG
+      labels, a class silently overriding a `fill` attribute, and a long unbreakable
+      citation widening the page past a phone screen are all invisible in markup.
 - [ ] Did you name the missing sources at the end of Phase 1, each with what it would
       unlock, without asking for a credential to be pasted?
 - [ ] Did any credential ever get requested in the conversation? It must not have.
