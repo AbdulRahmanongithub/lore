@@ -209,7 +209,9 @@ everything unverified. Otherwise you get the full two-phase run.
 existing folder, keeps every `[user]` answer verbatim, refreshes what came from code,
 and writes `.lore/CHANGELOG.md`.
 
-**Database access** is the one thing that needs a typed token. See below.
+**More access** — dev database, the live dev app, or production — is gated by a typed
+token each (`/lore-db`, `/lore-app`, `/lore-prod`). It offers these when it hits a wall
+it can't read past. See below.
 
 ---
 
@@ -230,28 +232,60 @@ A skill is instructions, not a sandbox — it cannot restrict the agent's tools,
 direct them. For a hard guarantee on a client's production repo, run it against a
 throwaway clone.
 
-### Database access needs a typed token
+### Access tiers
 
-Live databases are gated behind `/lore-db` in your message, and that is deliberately
-*not* conversational. In a long session "yeah go ahead" can refer to any of the last
-three things discussed; a typed token is unambiguous, deliberate, and sits in your
-transcript as evidence of when you granted it.
+Code can't answer everything — a committed threshold may not be what production runs. So
+`lore` can ask for more, and each tier reaching further out has its own gate:
 
-Two steps, both required:
+| Tier | Reaches | Gate |
+|---|---|---|
+| **code** | the repo, its history, committed config | none; the default |
+| **dev database** | live schema, constraints, lookup rows | `/lore-db` + target confirmation |
+| **dev application** | the running app in a browser, signed in | `/lore-app` + **you** sign in |
+| **production** | any production database or URL | `/lore-prod` + confirmation naming the host |
 
-1. Your message contains `/lore-db`
-2. It shows you the masked connection target and asks again before connecting
+It **offers** escalation tied to a specific wall — "these thresholds are committed
+defaults but a service reads them from a table at runtime; `/lore-db` would replace two
+`[inferred ⚠]` lines with real values" — and a decline is a complete answer. The gap goes
+to `11-open-questions.md` noting what access would close it.
 
-Then it runs schema introspection only — tables, columns, FKs, indexes, constraints,
-enum and lookup contents. Never your rows, never a write, never DDL.
+**Dev is the default everywhere.** "The database" means dev. A host or database name
+containing `prod`, `production` or `live` is production whatever you called it. Staging is
+offered first every time, because for schema, constraints, enum contents and the URL
+surface it answers identically with none of the risk.
 
-Without the token it still reads migration files, ORM models and entity classes, and
-says in the output that the schema came from code rather than a live connection.
+**Production takes two separate acts of consent:** the typed `/lore-prod`, then a reply
+naming the host back. A bare "yes" is deliberately not enough — that's the point of
+asking for the host. There the rules tighten rather than relax: no row data at all,
+`COUNT(*)` only, and no sign-in, because a session in production is a real session doing
+real things.
 
-Secrets are `[REDACTED]` before anything reaches chat or disk, with the shape kept
-because the shape is useful: `sk_live_[REDACTED] (live key, 107 chars, .env.production:8)`.
+**In the live app, navigation is read-only.** Follow links, read pages, observe
+redirects. No form submissions, no buttons that create or change anything, no non-GET
+requests. A documentation run that creates a record in a live system has broken the
+read-only rule as surely as editing source would.
 
----
+What that tier is *for*: the **observed** access matrix, which is often wider than the
+route table implies. A page the code marks `[Authorize]` that renders anonymously is the
+most valuable row in the document — and a security finding.
+
+### It never asks for your credentials
+
+`lore` will not ask you to type a password, API key or token into the conversation. Not
+for a dev box, not for a throwaway account, not if you offer.
+
+A credential pasted into a chat is in that transcript permanently: stored, synced across
+your devices, visible to anyone with access to the conversation, and impossible to rotate
+out afterwards. A tool that redacts the secrets it finds in your repo has no business
+soliciting fresh ones in plaintext.
+
+Instead: **you sign in to the app yourself**, and `lore` works in the session you
+authenticated. It never sees the password, and you end the access by logging out.
+Alternatively point it at a local file (`.env.development`) — it reads it, uses it, and
+treats every value as `[REDACTED]` in all output.
+
+Secrets found in your repo are `[REDACTED]` with the shape kept, because the shape is
+useful: `sk_live_[REDACTED] (live key, 107 chars, .env.production:8)`.
 
 ## Optional tooling
 
@@ -294,6 +328,28 @@ recovers the business from code.
 | `10-security.md` | Posture and 🚨 findings, hardcoded secrets first |
 | `11-open-questions.md` | Every unconfirmed inference. **This file existing is a feature.** |
 | `12-landmines.md` | Code that looks wrong but is deliberate. Read before changing anything. |
+| `html/` | The same facts as a readable doc set — six self-contained pages, no CDN, no build step. Open `index.html` by double-clicking it. |
+
+### The HTML doc set
+
+`.lore/*.md` is written for an agent to grep. `html/` is written for a **person** — a new
+developer on day one, a client who wants to know what they bought, a reviewer who will
+never open a terminal.
+
+| Page | Contents |
+|---|---|
+| `index.html` | What the app is, who uses it, how it works, and the vocabulary whose meaning here differs from the everyday one |
+| `pages.html` | Every URL and page, what it does, **who can reach it**, and anything with no authorization at all |
+| `rules.html` | Invariants, state machines (including illegal transitions), calculations with worked examples |
+| `data.html` | Entities, relationships, enums in full |
+| `operations.html` | Jobs, integrations, environments, how deployment actually happens |
+
+It renders **from** the finished markdown rather than beside it, so the two can't drift.
+Pages are self-contained — no CDN, no fonts fetched, no JavaScript — because this often
+describes a client's system, may be read offline, and should still work in two years.
+Provenance tags survive the rendering and `[inferred ⚠]` stays visually obvious: a guess
+that looks like a fact in a polished document is more dangerous than the same guess in
+plain markdown.
 
 Every line carries a provenance tag — `[code: path:line]`, `[config: …]`, `[user]`,
 `[inferred ⚠]` — so an agent can tell fact from guess at a glance. An unmarked guess
@@ -311,9 +367,11 @@ plugins/lore/
   skills/lore/
     SKILL.md                      ← the skill (single source of truth)
     references/
-      security.md                 ← DB gatekeeping, redaction, read-only rules
+      security.md                 ← DB gatekeeping, redaction, read-only, prod, credentials
       stack-detection.md          ← manifests, data stores, CI/CD per ecosystem
       output-template.md          ← content template for each .lore/ file
+      access-escalation.md        ← the four access tiers and their gates
+      html-output.md              ← the human-readable HTML doc set
       tooling.md                  ← which tools earn their place, and why not the rest
 bin/cli.js                        ← npx installer
 install.sh / install.ps1          ← curl installers

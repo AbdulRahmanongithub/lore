@@ -1,6 +1,6 @@
 ---
 name: lore
-description: Extracts a codebase's lore — the business logic, domain rules, invariants, state machines and tribal knowledge an AI coding agent cannot read from source — into a durable .lore/ folder plus AGENTS.md at the repo root, so you stop re-explaining your system every session. No command needed; plain conversation triggers it. Use whenever someone hands over code, repos, docs or website URLs and asks to map out the business, understand what a system actually does, onboard onto an unfamiliar codebase, build durable context for Claude Code or another agent, generate an AGENTS.md or business context file, or fix an agent that "doesn't understand the business logic" or "keeps breaking things it shouldn't touch." Also on /lore or /lore-db. Strictly READ-ONLY — it inspects and documents, never modifies. No source edits, no state-changing git commands, no installs, and no live database connection without the typed /lore-db token plus a separate confirmation.
+description: Understand any business from its code. Extracts business logic, domain rules, invariants, state machines and tribal knowledge into a durable .lore/ folder plus AGENTS.md and a human-readable HTML doc set covering every URL, page and who can access it. No command needed; plain conversation triggers it. Use whenever someone hands over code, repos or docs and asks to map out the business, understand what a system does, onboard onto an unfamiliar codebase, build durable context for Claude Code, document an app's pages and permissions, or fix an agent that "keeps breaking things it shouldn't touch." Also on /lore, /lore-db, /lore-app or /lore-prod. READ-ONLY — it inspects and documents, never modifies. Dev only by default; production needs a typed token plus confirmation; it never asks for credentials in chat.
 ---
 
 # lore
@@ -17,7 +17,7 @@ description: Extracts a codebase's lore — the business logic, domain rules, in
 
 > **Read-only skill.** Operate in read-only mode for the entire run. You inspect and
 > describe the system; you never change it. The only files you create are the output
-> documents in Phase 4. Full rules in P0 below and `references/security.md` §7.
+> documents in Phase 4. Full rules in P0 below and `references/security.md` §8.
 >
 > Your harness may well hand you write tools — Edit, Write, a shell that can commit and
 > install. Having them is not permission to use them here. Read-only is the operating
@@ -107,6 +107,14 @@ a secret. The short version:
 - **No live database access without `/lore-db`.** Migration files, ORM models and
   entity classes committed to the repo are source code and are always fair game — say
   in the output that the schema came from code, not a live connection.
+- **Dev is the default for everything outside the repo.** Database, app URL, all of it.
+  An ambiguous "the database" means dev; production is never inferred. Production takes
+  `/lore-prod` plus a confirmation that names the host back to you — see
+  `references/access-escalation.md`.
+- **Never ask the user to type a credential into the conversation.** No password, API key
+  or token, not even for a dev instance, not even when they offer. For the live app the
+  user signs in themselves and you use that session. Full rules in
+  `references/access-escalation.md`.
 - **With `/lore-db`, stop and ask before connecting.** Use the confirmation block in
   `references/security.md` §2, mask the target, flag it if it looks like production,
   and wait for an explicit yes.
@@ -202,7 +210,48 @@ why the schema is missing:
 
 That reads as naturally as anything else here, and it keeps the gate where it belongs.
 
-## 5. Phase 0 — Say what you're about to do
+## 5. Asking for more access
+
+Code cannot answer everything, and the honest response to a wall is to name it and ask.
+There are four tiers, each reaching further outside the repo than the last:
+
+| Tier | Reaches | Gate |
+|---|---|---|
+| **T0 — code** | the repo, its history, committed config | none; the default |
+| **T1 — dev database** | live schema, constraints, lookup rows | `/lore-db` + target confirmation |
+| **T2 — dev application** | the running app in a browser, signed in | `/lore-app` + the user signs in themselves |
+| **T3 — production** | any production database or URL | `/lore-prod` + two-step confirmation |
+
+Three rules govern all of them. `references/access-escalation.md` has the detail, and is
+required reading before you ask for anything above T0.
+
+**Offer, tied to a finding.** Never a generic request for more access. Name the wall,
+say which lines would change, and let the user decide: *"the thresholds in `03-rules.md`
+are committed defaults but `SettingsService.cs:40` reads them from a table at runtime —
+`/lore-db` would let me replace two `[inferred ⚠]` lines with real values."* A decline is
+a complete answer; the gap goes to `11-open-questions.md` noting what access would close
+it, and the run continues. Never ask twice in one run.
+
+**Dev unless told otherwise, and production is never inferred.** "The database" means
+dev. A host or database name containing `prod`, `production` or `live` is production
+whatever the user called it, and T3 applies. Offer staging first every time: for schema,
+constraints, enum contents and the URL surface it answers identically with none of the
+risk.
+
+**Credentials never enter the chat.** Do not ask the user to type a password, key or
+token into the conversation — not for a dev box, not for a throwaway account, not when
+they volunteer it. A credential in a transcript is stored, synced, visible to everyone
+with access to that conversation, and impossible to rotate out later. This skill redacts
+the secrets it finds in a repo; soliciting fresh ones in plain text would make that
+redaction meaningless. Instead the user signs in to the app themselves and you work in
+that session, or they point you at a local file you read and never echo.
+
+At T2, navigation is read-only: follow links, read pages, observe redirects. No form
+submissions, no buttons that create or change anything, no non-GET requests. A
+documentation run that creates a record in a live system has broken P0 exactly as much
+as editing source would.
+
+## 6. Phase 0 — Say what you're about to do
 
 Before reading anything, say in one or two plain sentences what you understood and what
 you're about to do, then show a compact scope block so the user can correct you cheaply.
@@ -236,7 +285,7 @@ many `[user]` lines are in it, and say that you will keep them. That folder may 
 answers that came out of someone's head in a conversation that is over and cannot be
 regenerated from code, so never silently overwrite it (§4).
 
-## 6. Phase 1 — Analyse
+## 7. Phase 1 — Analyse
 
 Read in this order. It front-loads signal and avoids burning context on generated code.
 
@@ -281,7 +330,7 @@ assets, generated clients and protobuf stubs, migration data dumps, snapshot/fix
 
 **Keep a running `[inferred ⚠]` list as you go.** Those become your questions in Phase 2.
 
-## 7. Phase 2 — Report, then ask. Do not write the folder yet.
+## 8. Phase 2 — Report, then ask. Do not write the folder yet.
 
 Output two things and stop.
 
@@ -341,10 +390,10 @@ Always close with:
 Then **wait**. If the user says "just generate it," comply, but mark every unanswered
 item `[inferred ⚠ — unconfirmed]` and keep it in `11-open-questions.md`.
 
-## 8. Phase 3 — Database pass
+## 9. Phase 3 — Database pass
 
 Only with the typed `/lore-db` token **and** a separate explicit confirmation on the
-specific target (§4, and `references/security.md` §2). Both steps, every time.
+specific target (§5, and `references/security.md` §2). Both steps, every time.
 
 Adapt to the store type (see `references/stack-detection.md`).
 
@@ -364,7 +413,7 @@ the DB with no entity property, entities with no table, migrations not applied. 
 one of the highest-value findings you can hand an agent, because it's invisible from
 either side alone.
 
-## 9. Phase 4 — Write the lore
+## 10. Phase 4 — Write the lore
 
 Write to the **repo root**, so an agent finds it without being told where to look:
 
@@ -384,11 +433,34 @@ Write to the **repo root**, so an agent finds it without being told where to loo
     ├── 09-infra.md        ← environments, CI/CD, containers, branching, observability
     ├── 10-security.md     ← posture + 🚨 findings, hardcoded secrets first
     ├── 11-open-questions.md
-    └── 12-landmines.md    ← read before changing anything
+    ├── 12-landmines.md    ← read before changing anything
+    └── html/              ← the same facts, for a person to read
+        ├── index.html     ← what it is, who uses it, how it works, vocabulary
+        ├── pages.html     ← every URL and page + who can reach each one
+        ├── rules.html     ← invariants, state machines, calculations
+        ├── data.html      ← entities, enums, relationships
+        ├── operations.html← jobs, integrations, environments, deployment
+        └── assets/style.css
 ```
 
 `references/output-template.md` has the full content template for each file — follow
 its headings exactly so the folder stays greppable across runs and across repos.
+
+**The HTML is for people, the markdown is for agents.** `references/html-output.md` has
+the spec. The one rule that matters more than the rest: **render the HTML from the
+finished markdown, never author the two separately.** Write `.lore/*.md` completely
+first, then generate `html/` from it. Authored in parallel they drift within a single
+revision, and a documentation set that contradicts itself is worse than either half
+alone, because the reader cannot tell which side is stale. The HTML therefore introduces
+no fact that is not already in a markdown file.
+
+Six HTML pages rather than thirteen: a person reading wants a few long pages with a clear
+spine, where an agent grepping wants one concern per file. Pages are self-contained —
+no CDN, no fonts fetched, no JavaScript — because this often describes a client's system,
+may be read offline or on an air-gapped machine, and should still work in two years.
+Provenance tags survive the rendering, and `[inferred ⚠]` stays visually obvious: a guess
+that looks like a fact in a polished document is more dangerous than the same guess in
+plain markdown, because the polish lends it authority.
 
 Two rules about this layout that matter more than they look:
 
@@ -419,7 +491,7 @@ opens to judge whether the run was any good.
 moment someone else joins. One line is enough: "commit `.lore/` and `AGENTS.md` so every
 agent session and every teammate gets the same context."
 
-## 10. Self-check before writing
+## 11. Self-check before writing
 
 - [ ] Is `03-rules.md` the longest file? If not, you documented a stack, not a business.
 - [ ] Does every line carry a provenance tag?
@@ -436,6 +508,12 @@ agent session and every teammate gets the same context."
 - [ ] Did you detect the stack rather than assume one, and name every component in a
       polyglot system?
 - [ ] Is the deployment path documented honestly, including "there is no pipeline"?
+- [ ] Was the HTML rendered from the finished markdown rather than written alongside it?
+- [ ] Does `pages.html` list every URL with who can reach it, including the pages with no
+      authorization attribute at all?
+- [ ] Did any credential ever get requested in the conversation? It must not have.
+- [ ] If production was touched, was there a typed `/lore-prod` **and** a confirmation
+      naming the host, and is the access recorded in the output?
 - [ ] Did you close with the tooling note — what was used, what was missing, and what
       each missing tool would have added?
 - [ ] Did you leave the system exactly as you found it — no edits, no git state changes,
@@ -444,11 +522,19 @@ agent session and every teammate gets the same context."
 ## Reference files
 
 - `references/security.md` — DB gatekeeping, the confirmation block, read-only rules
-  (global, §7), redaction, secret scanning, web boundaries. Read before any DB or web work.
+  (global, §8), redaction, secret scanning, web boundaries, production and credentials
+  (§7). Read before any DB or web work.
 - `references/stack-detection.md` — manifests per ecosystem, data-store types and what
   to extract from each, architecture styles, CI/CD and IaC detection.
 - `references/output-template.md` — the content template for each file in `.lore/`,
   plus what belongs in `AGENTS.md` and what must stay out.
+- `references/access-escalation.md` — the four access tiers and their gates, how to offer
+  escalation without nagging, why credentials never enter the chat, read-only navigation
+  in a live app, and the production two-step. Required reading before asking for anything
+  beyond the code.
+- `references/html-output.md` — the human-readable HTML set: page structure, the URL and
+  access inventory, why it renders from the markdown rather than beside it, and the
+  self-contained/no-CDN rule.
 - `references/tooling.md` — which optional open-source tools earn their place
   (ast-grep, gitleaks/trufflehog, scc, tbls, syft), how to detect them without the
   `sg`/setgroups trap, why embeddings and whole-repo packers are deliberately excluded,
